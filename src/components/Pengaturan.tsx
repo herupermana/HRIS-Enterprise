@@ -26,10 +26,61 @@ export default function Pengaturan({
   displayDensity = 'lapang', 
   onChangeDisplayDensity,
   dbStatus
-}: SettingsProps) {
+  }: SettingsProps) {
   const [shiftState, setShiftState] = useState(INITIAL_SHIFTS);
   const [isSaved, setIsSaved] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
+  const [showDiagnostic, setShowDiagnostic] = useState(false);
+
+  // States for live interactive database ping & troubleshooting
+  const [diagTesting, setDiagTesting] = useState(false);
+  const [diagResult, setDiagResult] = useState<{
+    success: boolean;
+    code?: string;
+    message: string;
+    details?: string;
+    solution?: string;
+  } | null>(null);
+  
+  const [useCustomDiagParams, setUseCustomDiagParams] = useState(false);
+  const [diagConfig, setDiagConfig] = useState({
+    host: "127.0.0.1",
+    port: "3306",
+    user: "",
+    password: "",
+    database: ""
+  });
+
+  const handleTestConnection = async () => {
+    setDiagTesting(true);
+    setDiagResult(null);
+    try {
+      const payload = useCustomDiagParams ? {
+        host: diagConfig.host,
+        port: diagConfig.port,
+        user: diagConfig.user,
+        password: diagConfig.password,
+        database: diagConfig.database
+      } : {}; // Empty payload triggers current .env testing
+
+      const res = await fetch("/api/db/ping", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      setDiagResult(data);
+    } catch (err: any) {
+      setDiagResult({
+        success: false,
+        message: "Kesalahan Jaringan / Internal",
+        details: err.message || "Gagal menghubungi API diagnostik.",
+        solution: "Pastikan dev server Node.js Anda berjalan aktif di port 3000."
+      });
+    } finally {
+      setDiagTesting(false);
+    }
+  };
 
   // General company state
   const [companyProfile, setCompanyProfile] = useState({
@@ -338,6 +389,162 @@ export default function Pengaturan({
             ) : (
               <p className="text-[11px] text-slate-400">Sedang memuat status database asinkron...</p>
             )}
+
+            {/* Live Interactive Database Connection Diagnostics */}
+            <div className="pt-3 border-t border-slate-100" id="live-db-diagnostics-test-panel">
+              <button
+                type="button"
+                onClick={() => setShowDiagnostic(!showDiagnostic)}
+                className="w-full text-left inline-flex items-center justify-between text-xs font-bold text-slate-700 hover:text-blue-600 transition-colors cursor-pointer"
+              >
+                <span className="flex items-center gap-1.5">
+                  <Server className="w-4 h-4 text-emerald-600" />
+                  Live Diagnostik &amp; Tes Ping Port
+                </span>
+                <span className="text-[10px] font-mono bg-slate-150 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200">
+                  {showDiagnostic ? "Tutup" : "Mulai Tes"}
+                </span>
+              </button>
+
+              <AnimatePresence>
+                {showDiagnostic && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="overflow-hidden mt-3 text-[11.5px] space-y-3 bg-slate-50 border border-slate-200 p-3.5 rounded-xl block shadow-inner-sm"
+                  >
+                    <div className="flex justify-between items-center pb-1 border-b border-slate-200">
+                      <span className="font-extrabold text-slate-800 text-[10px] uppercase tracking-wider flex items-center gap-1">
+                        🔍 Diagnostik Jaringan &amp; Port MySQL
+                      </span>
+                      <label className="inline-flex items-center gap-1 cursor-pointer text-[10.5px] font-bold text-blue-600 select-none">
+                        <input
+                          type="checkbox"
+                          checked={useCustomDiagParams}
+                          onChange={(e) => {
+                            setUseCustomDiagParams(e.target.checked);
+                            setDiagResult(null);
+                          }}
+                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-3 h-3 cursor-pointer"
+                        />
+                        Uji Manual
+                      </label>
+                    </div>
+
+                    {!useCustomDiagParams ? (
+                      <p className="text-slate-500 leading-snug text-[10.5px]">
+                        Sistem akan menjalankan kueri uji ping ke alamat MySQL yang terdaftar di konfigurasi file <code className="bg-slate-200 text-slate-700 px-1 rounded font-mono">.env</code> server saat ini.
+                      </p>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-2 mt-1 bg-white p-2.5 rounded-lg border border-slate-200 text-xs">
+                        <div className="col-span-2">
+                          <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Host IP / Domain:</label>
+                          <input
+                            type="text"
+                            value={diagConfig.host}
+                            onChange={(e) => setDiagConfig({ ...diagConfig, host: e.target.value })}
+                            placeholder="e.g. 127.0.0.1"
+                            className="w-full text-[11px] px-2 py-1 border border-slate-300 rounded focus:ring-1 focus:ring-blue-500 outline-none font-mono"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Port:</label>
+                          <input
+                            type="text"
+                            value={diagConfig.port}
+                            onChange={(e) => setDiagConfig({ ...diagConfig, port: e.target.value })}
+                            placeholder="3306"
+                            className="w-full text-[11px] px-2 py-1 border border-slate-300 rounded focus:ring-1 focus:ring-blue-500 outline-none font-mono"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Db Name:</label>
+                          <input
+                            type="text"
+                            value={diagConfig.database}
+                            onChange={(e) => setDiagConfig({ ...diagConfig, database: e.target.value })}
+                            placeholder="hris_db"
+                            className="w-full text-[11px] px-2 py-1 border border-slate-300 rounded focus:ring-1 focus:ring-blue-500 outline-none font-mono"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 mb-0.5">User Account:</label>
+                          <input
+                            type="text"
+                            value={diagConfig.user}
+                            onChange={(e) => setDiagConfig({ ...diagConfig, user: e.target.value })}
+                            placeholder="root"
+                            className="w-full text-[11px] px-2 py-1 border border-slate-300 rounded focus:ring-1 focus:ring-blue-500 outline-none font-mono"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Password:</label>
+                          <input
+                            type="password"
+                            value={diagConfig.password}
+                            onChange={(e) => setDiagConfig({ ...diagConfig, password: e.target.value })}
+                            placeholder="••••••••"
+                            className="w-full text-[11px] px-2 py-1 border border-slate-300 rounded focus:ring-1 focus:ring-blue-500 outline-none font-mono"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    <button
+                      type="button"
+                      disabled={diagTesting}
+                      onClick={handleTestConnection}
+                      className={`w-full font-bold py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition-colors cursor-pointer text-xs shadow-sm
+                        ${diagTesting ? "bg-slate-200 text-slate-400 cursor-not-allowed" : "bg-slate-800 text-white hover:bg-slate-700 active:bg-slate-900"}`}
+                    >
+                      {diagTesting ? (
+                        <>
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          Mengecek Jaringan &amp; Port...
+                        </>
+                      ) : (
+                        "Mulai Tes Koneksi (Ping)"
+                      )}
+                    </button>
+
+                    {/* Test Diagnosis Outcome Panel */}
+                    {diagResult && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 5 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className={`p-3 rounded-lg border text-[11px] space-y-1.5 leading-snug shadow-inner-sm
+                          ${diagResult.success 
+                            ? "bg-emerald-50 border-emerald-200 text-emerald-800" 
+                            : "bg-red-50 border-red-200 text-red-800"}`}
+                      >
+                        <div className="flex items-center gap-1.5 font-bold text-[11.5px]">
+                          {diagResult.success ? (
+                            <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+                          ) : (
+                            <div className="w-3.5 h-3.5 bg-red-600 rounded-full text-white text-[9px] font-extrabold flex items-center justify-center shrink-0">!</div>
+                          )}
+                          <span>{diagResult.message}</span>
+                        </div>
+                        <div>
+                          <p className="font-bold opacity-75">Detail Diagnosis:</p>
+                          <p className="font-mono text-[9.5px] pl-2 border-l border-current/20 leading-normal select-all">
+                            {diagResult.details || "Tidak ada rincian teknis."}
+                          </p>
+                        </div>
+                        {diagResult.solution && (
+                          <div className="pt-1.5 border-t border-current/10">
+                            <p className="font-bold text-slate-850 uppercase tracking-wider text-[9px]">💡 Solusi Penyelesaian:</p>
+                            <p className="text-slate-700 mt-0.5 font-medium">{diagResult.solution}</p>
+                          </div>
+                        )}
+                      </motion.div>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
 
             {/* aaPanel MySQL Configuration Portal Guide Button */}
             <div className="pt-2 border-t border-slate-100">

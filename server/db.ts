@@ -160,3 +160,86 @@ export function getDbStatus() {
     dataDirectory: DATA_DIR
   };
 }
+
+// Diagnostic connection test to provide deep troubleshooting feedback
+export async function pingDatabase(customConfig?: {
+  host?: string;
+  port?: number;
+  user?: string;
+  password?: string;
+  database?: string;
+}) {
+  const host = customConfig?.host || process.env.DB_HOST;
+  const user = customConfig?.user || process.env.DB_USER;
+  const password = customConfig?.password || process.env.DB_PASSWORD;
+  const database = customConfig?.database || process.env.DB_NAME;
+  const port = customConfig?.port || (process.env.DB_PORT ? parseInt(process.env.DB_PORT) : 3306);
+
+  if (!host || !user || !database) {
+    return {
+      success: false,
+      code: "MISSING_ENV_CONFIG",
+      message: "Konfigurasi database belum lengkap di file .env Anda.",
+      details: "Periksa .env untuk memastikan DB_HOST, DB_USER, dan DB_NAME sudah diisi.",
+      solution: "Silakan edit file .env di folder project Anda melalui aaPanel File Manager / Terminal."
+    };
+  }
+
+  try {
+    const conn = await mysql.createConnection({
+      host,
+      user,
+      password,
+      database,
+      port,
+      connectTimeout: 4000
+    });
+    
+    // Quick ping query
+    await conn.query("SELECT 1");
+    await conn.end();
+
+    return {
+      success: true,
+      message: "Sukses! Koneksi ke server MySQL berhasil dibuat dan diverifikasi.",
+      details: `Berhasil terhubung ke host '${host}' pada port ${port} menggunakan user '${user}'`,
+      solution: "Koneksi database Anda berjalan 100% normal dan siap menyinkronkan data HRIS!"
+    };
+  } catch (error: any) {
+    console.error("Diagnostic Ping Failed:", error);
+    const errCode = error.code || error.errno || "";
+    let message = "Gagal terhubung ke database.";
+    let details = error.message || "";
+    let solution = "Coba periksa kredensial database Anda atau status layanan server MySQL.";
+
+    if (errCode === "ECONNREFUSED") {
+      message = "Koneksi Ditolak (ECONNREFUSED)";
+      details = `Sistem gagal menghubungi server MySQL di alamat ${host}:${port}. Server menolak sambungan.`;
+      solution = "Pastikan servis MySQL/MariaDB sudah AKTIF di panel kontrol aaPanel Anda (App Store > MySQL > status Run). Pastikan juga port 3306 sudah dibuka di menu Security aaPanel dan firewall sistem VPS Linux Anda.";
+    } else if (errCode === "ER_ACCESS_DENIED_ERROR") {
+      message = "Kredensial Salah (Access Denied)";
+      details = `Username atau password untuk akun '${user}' ditolak oleh MySQL server.`;
+      solution = "Periksa kembali ejaan username dan password yang tercantum di file .env. Anda bisa melihat/mereset password database ini langsung melalui Tab 'Database' di aaPanel.";
+    } else if (errCode === "ER_BAD_DB_ERROR") {
+      message = "Database Tidak Ditemukan (Bad Database)";
+      details = `Koneksi berhasil ke MySQL, namun database dengan nama '${database}' tidak ada.`;
+      solution = "Pastikan nama database di file .env sama persis dengan database yang Anda tambahkan di aaPanel. Anda dapat menambahkan database baru dengan nama ini melalui menu 'Database > Add Database' di aaPanel.";
+    } else if (errCode === "ENOTFOUND") {
+      message = "Host Tidak Ditemukan (DNS Error/ENOTFOUND)";
+      details = `Alamat host '${host}' tidak dapat diselesaikan atau tidak terdaftar dalam jaringan server.`;
+      solution = "Jika MySQL berada di VPS yang sama, gunakan '127.0.0.1' atau 'localhost' sebagai DB_HOST Anda untuk rute tercepat dan teraman.";
+    } else if (errCode === "ETIMEDOUT") {
+      message = "Waktu Koneksi Habis (ETIMEDOUT)";
+      details = `Mencoba menghubungi ${host} tetapi tidak ada respons dalam batas waktu yang ditentukan.`;
+      solution = "Ini biasanya disebabkan oleh pemblokiran port 3306 oleh firewall. Periksa tab Security di aaPanel, atau setelan firewall penyedia VPS Anda (misalnya Alibaba Cloud, AWS, DigitalOcean) untuk mengizinkan lalu lintas masuk.";
+    }
+
+    return {
+      success: false,
+      code: errCode,
+      message,
+      details,
+      solution
+    };
+  }
+}

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Users, CheckCircle, Clock, Calendar, 
   Coins, Sliders, Menu, X, Activity, ChevronRight, Bell, HelpCircle, Smartphone,
-  FileText, Sun, Moon, Megaphone, ShoppingBag, Shield, ShieldAlert
+  FileText, Sun, Moon, Megaphone, ShoppingBag, Shield, ShieldAlert, Lock, LogIn, LogOut, Key, Database
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -27,6 +27,7 @@ import Komunikasi from './components/Komunikasi';
 import InventarisAset from './components/InventarisAset';
 import ManajemenUser from './components/ManajemenUser';
 import Pelanggaran from './components/Pelanggaran';
+import LoginPage from './components/LoginPage';
 
 
 export default function App() {
@@ -306,6 +307,14 @@ export default function App() {
     if (dbStatus.loading) return;
     saveCollectionToServer('violations', violations);
   }, [violations, dbStatus.loading]);
+
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    return localStorage.getItem('hris_is_authenticated') === 'true';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('hris_is_authenticated', isAuthenticated ? 'true' : 'false');
+  }, [isAuthenticated]);
 
   const [activeUser, setActiveUser] = useState<UserAccount>(() => {
     const savedUsers = localStorage.getItem('hris_users');
@@ -875,10 +884,7 @@ export default function App() {
   ];
 
   const menuItems = allMenuItems.filter(item => {
-    if (activeUser.role === 'Super Admin') return true;
-    if (activeUser.role === 'HR Manager') {
-      return item.id !== 'pengaturan';
-    }
+    if (activeUser.role === 'Super Admin' || activeUser.role === 'HR Manager') return true;
     if (activeUser.role === 'Division Manager') {
       return ['dashboard', 'karyawan', 'payroll', 'cuti', 'manajemen-user'].includes(item.id);
     }
@@ -925,6 +931,20 @@ export default function App() {
     }
     return false;
   });
+
+  if (!isAuthenticated) {
+    return (
+      <LoginPage 
+        users={users}
+        dbStatus={dbStatus}
+        onLoginSuccess={(user) => {
+          setActiveUser(user);
+          setIsAuthenticated(true);
+          addAuditLog('Konfigurasi', 'Login Sukses', `Pengguna ${user.name} (${user.role}) berhasil masuk ke sistem.`);
+        }}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#F8FAFC]" id="hris-root">
@@ -1092,6 +1112,21 @@ export default function App() {
                 >
                   {activeUser.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
                 </div>
+                
+                {/* Logout Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsAuthenticated(false);
+                    addAuditLog('Konfigurasi', 'Logout Sukses', `Pengguna ${activeUser.name} keluar secara aman.`);
+                  }}
+                  className="p-1 px-1.5 bg-rose-50 dark:bg-rose-950/25 hover:bg-rose-100 dark:hover:bg-rose-900/30 text-rose-600 dark:text-rose-450 rounded-lg transition-all flex items-center justify-center cursor-pointer font-bold gap-1 ml-1"
+                  title="Keluar dari Sesi"
+                  id="session-logout-btn"
+                >
+                  <LogOut className="w-3.5 h-3.5 shrink-0" />
+                  <span className="text-[10px] hidden md:inline">Keluar</span>
+                </button>
               </div>
             </div>
           </div>
@@ -1150,9 +1185,24 @@ export default function App() {
                   </nav>
                 </div>
 
-                <div className="pt-4 border-t border-slate-800 text-[10px] text-slate-500 leading-4">
-                  <p className="font-bold text-slate-300">PT Enterprise Solutions</p>
-                  <p>Fingerprint Solution X-100C API Bridge</p>
+                <div className="pt-4 border-t border-slate-800 space-y-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      setIsAuthenticated(false);
+                      addAuditLog('Konfigurasi', 'Logout Sukses', `Pengguna ${activeUser.name} keluar via mobile.`);
+                    }}
+                    className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 bg-rose-600/20 hover:bg-rose-600 text-rose-400 hover:text-white font-bold text-[11px] rounded-xl transition-all border border-rose-500/20 cursor-pointer"
+                    id="mobile-drawer-logout-btn"
+                  >
+                    <LogOut className="w-3.5 h-3.5 shrink-0" />
+                    Keluar Sesi 👤
+                  </button>
+                  <div className="text-[10px] text-slate-500 leading-4">
+                    <p className="font-bold text-slate-300">PT Enterprise Solutions</p>
+                    <p>Fingerprint Solution X-100C API Bridge</p>
+                  </div>
                 </div>
               </motion.div>
             </div>

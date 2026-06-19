@@ -2,7 +2,7 @@ import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
-import { initializeDatabase, loadHrisData, saveHrisCollection, getDbStatus } from "./server/db";
+import { initializeDatabase, loadHrisData, saveHrisCollection, getDbStatus, pingDatabase } from "./server/db";
 
 async function startServer() {
   // Initialize the database connection (checks .env for MySQL)
@@ -138,6 +138,28 @@ Harap kembalikan laporan analitis ini langsung dalam format teks Markdown.`;
     } catch (error: any) {
       console.error(`Error saving HRIS collection '${req.body?.key}':`, error);
       return res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // Endpoint to ping / test database connection with direct diagnosis
+  app.post("/api/db/ping", async (req, res) => {
+    try {
+      const { host, port, user, password, database } = req.body || {};
+      const result = await pingDatabase({
+        host,
+        port: port ? parseInt(port) : undefined,
+        user,
+        password,
+        database
+      });
+      return res.json(result);
+    } catch (error: any) {
+      console.error("Error running connection diagnostics:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Terjadi kesalahan internal saat menjalankan tes koneksi.",
+        details: error.message || ""
+      });
     }
   });
 
