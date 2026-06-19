@@ -2,8 +2,12 @@ import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
+import { initializeDatabase, loadHrisData, saveHrisCollection, getDbStatus } from "./server/db";
 
 async function startServer() {
+  // Initialize the database connection (checks .env for MySQL)
+  await initializeDatabase();
+
   const app = express();
   const PORT = 3000;
 
@@ -96,6 +100,44 @@ Harap kembalikan laporan analitis ini langsung dalam format teks Markdown.`;
         success: false,
         error: error.message || "Terjadi kesalahan internal saat menghubungi Gemini AI."
       });
+    }
+  });
+
+  // --- DATABASE API ENDPOINTS ---
+  
+  // Endpoint to get database connection status
+  app.get("/api/db/status", (req, res) => {
+    try {
+      const status = getDbStatus();
+      return res.json({ success: true, ...status });
+    } catch (error: any) {
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // Endpoint to load all HRIS collections
+  app.get("/api/db/load", async (req, res) => {
+    try {
+      const data = await loadHrisData();
+      return res.json({ success: true, data });
+    } catch (error: any) {
+      console.error("Error loading HRIS database:", error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // Endpoint to save a specific HRIS collection
+  app.post("/api/db/save", async (req, res) => {
+    try {
+      const { key, data } = req.body;
+      if (!key) {
+        return res.status(400).json({ success: false, error: "Query parameter 'key' is required" });
+      }
+      await saveHrisCollection(key, data);
+      return res.json({ success: true, message: `Koleksi '${key}' berhasil disimpan.` });
+    } catch (error: any) {
+      console.error(`Error saving HRIS collection '${req.body?.key}':`, error);
+      return res.status(500).json({ success: false, error: error.message });
     }
   });
 

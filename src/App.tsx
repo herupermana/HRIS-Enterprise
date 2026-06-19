@@ -154,6 +154,159 @@ export default function App() {
     return saved ? JSON.parse(saved) : INITIAL_VIOLATIONS;
   });
 
+  // --- DATABASE PERSISTENCE CODE ---
+  const [dbStatus, setDbStatus] = useState<{
+    connected?: boolean;
+    engine?: string;
+    loading: boolean;
+    error: string | null;
+    saving: boolean;
+    savingDetails: string | null;
+  }>({ loading: true, error: null, saving: false, savingDetails: null });
+
+  // Load all initial data from DB backend on startup
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const res = await fetch("/api/db/load");
+        const json = await res.json();
+        
+        if (json.success && json.data) {
+          const dbData = json.data;
+          if (dbData.employees) setEmployees(dbData.employees);
+          if (dbData.attendance) setAttendance(dbData.attendance);
+          if (dbData.leaves) setLeaves(dbData.leaves);
+          if (dbData.payrollRecords) setPayrollRecords(dbData.payrollRecords);
+          if (dbData.deviceConfig) setDeviceConfig(dbData.deviceConfig);
+          if (dbData.periods) setPeriods(dbData.periods);
+          if (dbData.auditLogs) setAuditLogs(dbData.auditLogs);
+          if (dbData.salaryHistory) setSalaryHistory(dbData.salaryHistory);
+          if (dbData.mutationHistory) setMutationHistory(dbData.mutationHistory);
+          if (dbData.holidays) setHolidays(dbData.holidays);
+          if (dbData.announcements) setAnnouncements(dbData.announcements);
+          if (dbData.assets) setAssets(dbData.assets);
+          if (dbData.users) setUsers(dbData.users);
+          if (dbData.violations) setViolations(dbData.violations);
+        }
+
+        const statusRes = await fetch("/api/db/status");
+        const statusJson = await statusRes.json();
+        setDbStatus({
+          loading: false,
+          error: null,
+          connected: statusJson.isConnected,
+          engine: statusJson.engine,
+          saving: false,
+          savingDetails: null
+        });
+      } catch (err: any) {
+        console.error("Gagal memuat database dari hulu server:", err);
+        setDbStatus({
+          loading: false,
+          error: "Gagal memuat database server, menggunakan penyimpanan lokal.",
+          connected: false,
+          engine: "Local Browser Storage",
+          saving: false,
+          savingDetails: null
+        });
+      }
+    }
+    loadData();
+  }, []);
+
+  // Shared function to update backend collection
+  const saveCollectionToServer = async (key: string, data: any) => {
+    try {
+      setDbStatus(prev => ({ ...prev, saving: true, savingDetails: `Menyimpan ${key}...` }));
+      const response = await fetch("/api/db/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key, data })
+      });
+      const resJson = await response.json();
+      if (!resJson.success) {
+        console.error(`Gagal menyimpan ${key} ke server:`, resJson.error);
+      }
+    } catch (err) {
+      console.error(`Error saving ${key} to server:`, err);
+    } finally {
+      setTimeout(() => {
+        setDbStatus(prev => ({ ...prev, saving: false, savingDetails: null }));
+      }, 500);
+    }
+  };
+
+  // Synchronizers for DB (triggered ONLY when loading is finished)
+  useEffect(() => {
+    if (dbStatus.loading) return;
+    saveCollectionToServer('employees', employees);
+  }, [employees, dbStatus.loading]);
+
+  useEffect(() => {
+    if (dbStatus.loading) return;
+    saveCollectionToServer('attendance', attendance);
+  }, [attendance, dbStatus.loading]);
+
+  useEffect(() => {
+    if (dbStatus.loading) return;
+    saveCollectionToServer('leaves', leaves);
+  }, [leaves, dbStatus.loading]);
+
+  useEffect(() => {
+    if (dbStatus.loading) return;
+    saveCollectionToServer('payrollRecords', payrollRecords);
+  }, [payrollRecords, dbStatus.loading]);
+
+  useEffect(() => {
+    if (dbStatus.loading) return;
+    saveCollectionToServer('deviceConfig', deviceConfig);
+  }, [deviceConfig, dbStatus.loading]);
+
+  useEffect(() => {
+    if (dbStatus.loading) return;
+    saveCollectionToServer('periods', periods);
+  }, [periods, dbStatus.loading]);
+
+  useEffect(() => {
+    if (dbStatus.loading) return;
+    saveCollectionToServer('auditLogs', auditLogs);
+  }, [auditLogs, dbStatus.loading]);
+
+  useEffect(() => {
+    if (dbStatus.loading) return;
+    saveCollectionToServer('salaryHistory', salaryHistory);
+  }, [salaryHistory, dbStatus.loading]);
+
+  useEffect(() => {
+    if (dbStatus.loading) return;
+    saveCollectionToServer('mutationHistory', mutationHistory);
+  }, [mutationHistory, dbStatus.loading]);
+
+  useEffect(() => {
+    if (dbStatus.loading) return;
+    saveCollectionToServer('holidays', holidays);
+  }, [holidays, dbStatus.loading]);
+
+  useEffect(() => {
+    if (dbStatus.loading) return;
+    saveCollectionToServer('announcements', announcements);
+  }, [announcements, dbStatus.loading]);
+
+  useEffect(() => {
+    if (dbStatus.loading) return;
+    saveCollectionToServer('assets', assets);
+  }, [assets, dbStatus.loading]);
+
+  useEffect(() => {
+    if (dbStatus.loading) return;
+    saveCollectionToServer('users', users);
+  }, [users, dbStatus.loading]);
+
+  useEffect(() => {
+    if (dbStatus.loading) return;
+    saveCollectionToServer('violations', violations);
+  }, [violations, dbStatus.loading]);
+
   const [activeUser, setActiveUser] = useState<UserAccount>(() => {
     const savedUsers = localStorage.getItem('hris_users');
     const parsedUsers: UserAccount[] = savedUsers ? JSON.parse(savedUsers) : INITIAL_USERS;
@@ -855,6 +1008,12 @@ export default function App() {
           <p className="font-extrabold text-white flex items-center gap-1.5">
             <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" /> Solution SDK: Live
           </p>
+          <p className="text-slate-400 font-bold flex items-center gap-1.5">
+            <span className={`w-1.5 h-1.5 rounded-full ${dbStatus.connected ? 'bg-green-500' : 'bg-amber-500 animate-pulse'}`} />
+            DB: <span className="text-slate-200 font-mono text-[10px] truncate max-w-[140px]" title={dbStatus.engine}>
+              {dbStatus.saving ? 'Syncing...' : (dbStatus.connected ? 'MySQL Live' : 'Local Disk')}
+            </span>
+          </p>
           <p className="text-slate-400">Device ID: <span className="font-mono text-slate-300">X-100C-01</span></p>
           <p className="text-[9.5px] text-slate-500">API Server: 192.168.1.18</p>
         </div>
@@ -1208,6 +1367,7 @@ export default function App() {
                   <Pengaturan 
                     displayDensity={displayDensity}
                     onChangeDisplayDensity={setDisplayDensity}
+                    dbStatus={dbStatus}
                   />
                 </motion.div>
               )}

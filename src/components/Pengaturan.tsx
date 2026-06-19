@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Sliders, Shield, Landmark, MapPin, 
-  HelpCircle, Settings, CheckCircle, RefreshCw, Clock 
+  HelpCircle, Settings, CheckCircle, RefreshCw, Clock, Database, Server
 } from 'lucide-react';
 import { Employee } from '../types';
 import { INITIAL_SHIFTS } from '../data';
@@ -11,15 +11,25 @@ interface SettingsProps {
   onUpdateShiftConfig?: (cfg: any) => void;
   displayDensity?: 'ringkas' | 'lapang';
   onChangeDisplayDensity?: (density: 'ringkas' | 'lapang') => void;
+  dbStatus?: {
+    connected?: boolean;
+    engine?: string;
+    loading: boolean;
+    error: string | null;
+    saving: boolean;
+    savingDetails: string | null;
+  };
 }
 
 export default function Pengaturan({ 
   onUpdateShiftConfig, 
   displayDensity = 'lapang', 
-  onChangeDisplayDensity 
+  onChangeDisplayDensity,
+  dbStatus
 }: SettingsProps) {
   const [shiftState, setShiftState] = useState(INITIAL_SHIFTS);
   const [isSaved, setIsSaved] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
 
   // General company state
   const [companyProfile, setCompanyProfile] = useState({
@@ -267,6 +277,137 @@ export default function Pengaturan({
                   Monitor Besar
                 </span>
               </button>
+            </div>
+          </div>
+
+          {/* Database Setup & Status Card */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4" id="db-setup-status-card">
+            <h4 className="text-sm font-semibold text-slate-850 tracking-tight flex items-center gap-1.5 pb-2 border-b border-slate-100">
+              <Database className="w-4.5 h-4.5 text-blue-600" /> Status &amp; Integrasi Database
+            </h4>
+
+            {dbStatus ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-slate-50/50">
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex h-2 w-2">
+                      {dbStatus.connected ? (
+                        <>
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="animate-pulse absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                        </>
+                      )}
+                    </div>
+                    <span className="text-slate-700 font-bold text-xs">
+                      {dbStatus.connected ? "MySQL Terkoneksi" : "Local Backup (Luring)"}
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-mono bg-blue-50 text-blue-700 font-bold px-2 py-0.5 rounded-lg border border-blue-200">
+                    {dbStatus.connected ? "aaPanel Prod" : "Disk Local"}
+                  </span>
+                </div>
+
+                <div className="text-[11px] space-y-1.5 text-slate-600 font-medium">
+                  <div className="flex justify-between">
+                    <span className="text-slate-400 font-normal">Mesin Database:</span>
+                    <span>{dbStatus.engine || "Koleksi JSON File-System"}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400 font-normal">Sinkronisasi Otomatis:</span>
+                    <span className="text-green-600 font-bold">Aktif (Real-Time)</span>
+                  </div>
+                  {dbStatus.connected && (
+                    <div className="flex justify-between">
+                      <span className="text-slate-400 font-normal">Host Koneksi:</span>
+                      <span className="font-mono text-[10px]">localhost / 127.0.0.1</span>
+                    </div>
+                  )}
+                </div>
+
+                {dbStatus.error && (
+                  <p className="text-[10px] text-amber-600 bg-amber-50 border border-amber-200 p-2 rounded-lg leading-snug">
+                    {dbStatus.error}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <p className="text-[11px] text-slate-400">Sedang memuat status database asinkron...</p>
+            )}
+
+            {/* aaPanel MySQL Configuration Portal Guide Button */}
+            <div className="pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setShowGuide(!showGuide)}
+                className="w-full text-left inline-flex items-center justify-between text-xs font-bold text-blue-600 hover:text-blue-500 transition-colors cursor-pointer"
+              >
+                <span>{showGuide ? "▲ Sembunyikan Panduan aaPanel" : "▼ Lihat Panduan aaPanel Database"}</span>
+                <span className="text-[10px] font-mono bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">Tutorial VPS</span>
+              </button>
+
+              <AnimatePresence>
+                {showGuide && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="overflow-hidden mt-3 text-[11px] text-slate-600 leading-relaxed space-y-2 bg-slate-50 border border-slate-200 p-3.5 rounded-xl block shadow-inner-sm"
+                  >
+                    <p className="font-bold text-slate-800 text-xs">🛠️ Panduan Integrasi MySQL di aaPanel:</p>
+                    
+                    <div className="space-y-1 mt-1.5 list-decimal text-[11.5px]">
+                      <p className="font-bold text-slate-700">1. Buat Database Baru di aaPanel</p>
+                      <ul className="list-disc pl-4 space-y-0.5 text-slate-500 text-[10.5px]">
+                        <li>Masuk ke dasbor <strong>aaPanel</strong> Anda.</li>
+                        <li>Klik menu <strong>Database</strong> di sidebar kiri, lalu klik tombol <strong>Add Database</strong>.</li>
+                        <li>Set <strong>Database name</strong>: <code className="bg-slate-200 px-1 rounded font-mono text-[10px]">hris_db</code> (bebas).</li>
+                        <li>Pilih <strong>Charset</strong>: <code className="bg-slate-200 px-1 rounded font-mono text-[10px]">utf8mb4</code>.</li>
+                        <li>Username dan Password akan terbuat otomatis, salin kredensial tersebut.</li>
+                      </ul>
+
+                      <p className="font-bold text-slate-700 mt-2.5">2. Konfigurasi File <code className="font-mono bg-slate-200 px-1 rounded">.env</code> di VPS Anda</p>
+                      <ul className="list-disc pl-4 space-y-0.5 text-slate-500 text-[10.5px]">
+                        <li>Buka menu <strong>Files</strong> di aaPanel, navigasikan ke folder repositori Node project Anda: <code className="bg-slate-200 px-1 rounded font-mono text-[10px] text-slate-700 font-bold">/www/wwwroot/ideabuabu.web.id/hris/</code>.</li>
+                        <li>Buat file baru bernama <span className="font-extrabold text-slate-800">.env</span> (atau edit file yang ada).</li>
+                        <li>Salin dan tempel konfigurasi berikut, sesuaikan dengan database yang telah Anda buat:</li>
+                      </ul>
+                      
+                      <pre className="bg-slate-900 text-slate-300 p-2.5 rounded-lg text-[9.5px] font-mono leading-relaxed select-all overflow-x-auto whitespace-pre block mt-1.5 scrollbar-thin">
+{`# Database Credential
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_USER=nama_user_database_anda
+DB_PASSWORD=password_database_anda
+DB_NAME=nama_database_anda
+
+# Gemini AI (Opsional untuk Fitur Smart Advisors)
+GEMINI_API_KEY=kunci_gemini_api_anda`}
+                      </pre>
+
+                      <p className="font-bold text-slate-700 mt-2.5">3. Tambahkan Domain <code className="font-mono bg-slate-200 px-1 rounded text-slate-850 font-bold">hrispwk.ideabuabu.web.id</code></p>
+                      <ul className="list-disc pl-4 space-y-0.5 text-slate-500 text-[10.5px]">
+                        <li>Di aaPanel, ke menu <strong>Website</strong> &gt; klik <strong>Node Project</strong> tab.</li>
+                        <li>Klik tombol <strong>Add Node Project</strong> jika belum ada, masukkan port <code className="bg-slate-200 px-1 rounded font-mono text-[10px]">3000</code>.</li>
+                        <li>Di kolom <strong>Domain</strong>, masukkan <code className="bg-slate-200 px-1 rounded font-mono text-[10px]">hrispwk.ideabuabu.web.id</code>.</li>
+                        <li>aaPanel akan otomatis membuat reservasi proxy domain ke port 3000.</li>
+                      </ul>
+
+                      <p className="font-bold text-slate-700 mt-2.5">4. Jalankan Aplikasi &amp; Restart PM2</p>
+                      <ul className="list-disc pl-4 space-y-0.5 text-slate-500 text-[10.5px]">
+                        <li>Buka terminal VPS atau gunakan modul Terminal di aaPanel dan jalankan perintah:</li>
+                        <li><code className="bg-slate-900 text-slate-300 px-1.5 py-0.5 rounded font-mono text-[10.5px] block mt-1">pm2 restart hris-app || pm2 start dist/server.cjs --name "hris-app"</code></li>
+                        <li>Aplikasi kini terhubung secara aman ke database lokal MySQL aaPanel VPS Anda!</li>
+                      </ul>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </div>
 
