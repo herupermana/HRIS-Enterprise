@@ -1,0 +1,309 @@
+@import "tailwindcss";
+
+@media print {
+  /* Exclude print targets and their ancestors from display none */
+  body > *:not(#root):not(#id-card-print-portal):not(#slip-print-portal):not(#attendance-print-portal),
+  #root > *:not(#hris-root):not(#id-card-print-portal):not(#slip-print-portal):not(#attendance-print-portal),
+  #hris-root > *:not(#main-frame-parent):not(#id-card-print-portal):not(#slip-print-portal):not(#attendance-print-portal),
+  #main-frame-parent > *:not(main):not(#id-card-print-portal):not(#slip-print-portal):not(#attendance-print-portal),
+  main > *:not(#id-card-print-portal):not(#slip-print-portal):not(#attendance-print-portal),
+  dialog,
+  .fixed:not(#id-card-print-portal):not(#slip-print-portal):not(#attendance-print-portal),
+  .backdrop-blur-sm,
+  #header-notify-bell,
+  header {
+    display: none !important;
+    opacity: 0 !important;
+  }
+
+  /* Force print target to display cleanly as a centered high fidelity element */
+  #id-card-print-portal {
+    display: flex !important;
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    z-index: 9999999 !important;
+    align-items: center !important;
+    justify-content: center !important;
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+
+  /* Formal payslip printable section style */
+  #slip-print-portal,
+  #attendance-print-portal {
+    display: block !important;
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    z-index: 9999999 !important;
+    margin: 0 !important;
+    padding: 24px !important;
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+
+  @page {
+    size: auto;
+    margin: 15mm 10mm 15mm 10mm;
+  }
+}
+
+/* DARK MODE SYSTEM & MANUAL CSS OVERRIDES */
+body, html, #hris-root {
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.dark {
+  color-scheme: dark;
+}
+
+/* Core active workspace background */
+.dark #admin-workspace-pane,
+.dark #main-frame-parent,
+.dark #hris-active-workspace,
+.dark #hris-root,
+.dark body {
+  background-color: #0F172A !important; /* Rich Dark Slate-900 */
+  color: #F8FAFC !important;
+}
+
+/* Header overrides */
+.dark #hris-header {
+  background-color: #1E293B !important; /* Dark Slate-800 */
+  border-color: #334155 !important; /* border Slate-700 */
+  color: #F8FAFC !important;
+}
+
+/* Generic component/card containers */
+.dark .bg-white {
+  background-color: #1E293B !important;
+  background-image: none !important;
+  color: #F8FAFC !important;
+}
+
+/* Subtle background colors like grey subpanels */
+.dark .bg-slate-50,
+.dark .bg-gray-50,
+.dark .bg-slate-100\/50,
+.dark .bg-slate-50\/50,
+.dark .bg-slate-50\/70,
+.dark .bg-slate-100 {
+  background-color: #0F172A !important;
+  color: #F8FAFC !important;
+}
+
+/* Forms & Manual Input Sections inside Cards */
+.dark input,
+.dark select,
+.dark textarea {
+  background-color: #0F172A !important;
+  border-color: #334155 !important;
+  color: #F1F5F9 !important;
+}
+
+.dark input:focus,
+.dark select:focus,
+.dark textarea:focus {
+  border-color: #3B82F6 !important; /* Active blue focus */
+  outline: none !important;
+}
+
+/* Make sure labels and span texts look good */
+.dark label,
+.dark .text-slate-700,
+.dark .text-slate-650,
+.dark .text-slate-600,
+.dark .text-gray-700,
+.dark .text-gray-650,
+.dark .text-gray-600 {
+  color: #CBD5E1 !important; /* Soft Slate-300 */
+}
+
+/* Light gray text for descriptions, subheadings, dates */
+.dark .text-slate-500,
+.dark .text-slate-400,
+.dark .text-gray-500,
+.dark .text-gray-400 {
+  color: #94A3B8 !important; /* Slate-400 */
+}
+
+/* Primary text, titles, values - ensure full visibility */
+.dark h1, .dark h2, .dark h3, .dark h4, .dark h5, .dark h6,
+.dark .text-slate-800,
+.dark .text-slate-900,
+.dark .text-slate-850,
+.dark .text-gray-800,
+.dark .text-gray-900,
+.dark .text-slate-950,
+.dark .font-bold.text-slate-800 {
+  color: #FFFFFF !important;
+}
+
+/* Hover borders/background transitions if they are grays */
+.dark .hover\:bg-slate-50:hover,
+.dark .hover\:bg-gray-50:hover,
+.dark .hover\:bg-slate-100:hover,
+.dark .hover\:bg-slate-50\/50:hover {
+  background-color: #1E293B !important;
+}
+
+/* Table borders & headings */
+.dark table {
+  border-color: #334155 !important;
+}
+
+.dark th {
+  background-color: #0F172A !important;
+  color: #CBD5E1 !important;
+  border-color: #334155 !important;
+}
+
+.dark td {
+  border-color: #334155 !important;
+}
+
+/* Generic Slate and Gray borders */
+.dark .border,
+.dark .border-slate-100,
+.dark .border-slate-150,
+.dark .border-slate-200,
+.dark .border-slate-205,
+.dark .border-slate-300,
+.dark .border-dashed,
+.dark .border-gray-100,
+.dark .border-gray-200 {
+  border-color: #334155 !important;
+}
+
+/* Specific modal panels or details view */
+.dark .bg-slate-50\/70 {
+  background-color: #0F172A !important;
+}
+
+.dark .shadow-xs,
+.dark .shadow-sm,
+.dark .shadow {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2.5px 4px -1px rgba(0, 0, 0, 0.2) !important;
+}
+
+/* Recharts custom CSS for dark mode alignment */
+.dark .recharts-cartesian-grid-horizontal line,
+.dark .recharts-cartesian-grid-vertical line {
+  stroke: #334155 !important;
+}
+
+.dark .recharts-text {
+  fill: #94A3B8 !important;
+}
+
+/* Scrollbar override for comfortable night reading */
+.dark ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.dark ::-webkit-scrollbar-track {
+  background: #0F172A;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 4px;
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+/* Preserve Portal Karyawan Employee View in dark mode */
+.dark .bg-slate-950 {
+  background-color: #090D16 !important;
+}
+
+/* DISPLAY DENSITY: RINGKAS (COMPACT MODE) FOR HRIS DASHBOARD */
+.density-ringkas {
+  gap: 12px !important;
+}
+
+.density-ringkas.space-y-6 > :not([hidden]) ~ :not([hidden]) {
+  margin-top: 1rem !important;
+}
+
+.density-ringkas .space-y-6 > :not([hidden]) ~ :not([hidden]) {
+  margin-top: 1rem !important;
+}
+
+.density-ringkas .space-y-4 > :not([hidden]) ~ :not([hidden]) {
+  margin-top: 0.75rem !important;
+}
+
+.density-ringkas .p-6 {
+  padding: 1rem !important;
+}
+
+.density-ringkas .p-5 {
+  padding: 0.85rem !important;
+}
+
+.density-ringkas .p-4 {
+  padding: 0.75rem !important;
+}
+
+.density-ringkas .gap-6 {
+  gap: 1rem !important;
+}
+
+.density-ringkas .gap-4 {
+  gap: 0.75rem !important;
+}
+
+.density-ringkas #quick-actions-panel button {
+  padding: 0.75rem !important;
+}
+
+.density-ringkas .h-72 {
+  height: 220px !important;
+}
+
+.density-ringkas .h-68 {
+  height: 200px !important;
+}
+
+.density-ringkas .h-56 {
+  height: 180px !important;
+}
+
+.density-ringkas table th,
+.density-ringkas table td {
+  padding-top: 0.5rem !important;
+  padding-bottom: 0.5rem !important;
+  padding-left: 0.75rem !important;
+  padding-right: 0.75rem !important;
+}
+
+.density-ringkas .p-2.5 {
+  padding: 0.5rem !important;
+}
+
+.density-ringkas .p-3 {
+  padding: 0.6rem !important;
+}
+
+.density-ringkas .py-5 {
+  padding-top: 0.75rem !important;
+  padding-bottom: 0.75rem !important;
+}
+
+.density-ringkas .my-1.5 {
+  margin-top: 0.25rem !important;
+  margin-bottom: 0.25rem !important;
+}
+
+.density-ringkas .grid-cols-7 .p-2 {
+  padding: 0.35rem !important;
+}
+

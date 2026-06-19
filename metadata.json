@@ -1,0 +1,6 @@
+{
+  "name": "HRIS Enterprise & Solution X-100c Sync",
+  "description": "Sistem Informasi SDM (HRIS) tingkat enterprise dengan manajemen karyawan, pengajian dinamis, cuti, modul komunikasi massal/pengumuman internal otomatis, dan sinkronisasi mesin sidik jari Solution X-100C.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
