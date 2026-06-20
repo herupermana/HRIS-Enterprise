@@ -1,5 +1,6 @@
 import React from 'react';
 import { motion } from 'motion/react';
+import { getApiUrl } from '../utils';
 import { 
   Users, CheckCircle, Clock, Calendar, 
   DollarSign, Activity, AlertCircle, TrendingUp,
@@ -1134,7 +1135,7 @@ export default function Dashboard({
     setInsightLoading(true);
     setInsightError('');
     try {
-      const response = await fetch('/api/gemini/insight', {
+      const response = await fetch(getApiUrl('/api/gemini/insight'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

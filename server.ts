@@ -14,6 +14,18 @@ async function startServer() {
   // Enable JSON parse for POST payloads
   app.use(express.json({ limit: '10mb' }));
 
+  // Middleware to normalize /hris requests for subdirectory deployments
+  app.use((req, res, next) => {
+    if (req.url.startsWith('/hris/api/')) {
+      req.url = req.url.replace('/hris/api/', '/api/');
+    } else if (req.url === '/hris' || req.url === '/hris/') {
+      req.url = '/';
+    } else if (req.url.startsWith('/hris/')) {
+      req.url = req.url.replace('/hris/', '/');
+    }
+    next();
+  });
+
   // API: Smart Insight Attendance trends and HR policy advisor
   app.post("/api/gemini/insight", async (req, res) => {
     try {

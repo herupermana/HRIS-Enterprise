@@ -7,6 +7,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 
 import { Employee, AttendanceRecord, PayrollRecord, PayrollPeriod, LeaveRequest, SolutionDeviceConfig, AuditLog, SalaryHistoryRecord, MutationHistoryRecord, Holiday, Announcement, CompanyAsset, UserAccount, UserRole, ViolationRecord } from './types';
+import { getApiUrl } from './utils';
 import { 
   INITIAL_EMPLOYEES, INITIAL_ATTENDANCE, INITIAL_LEAVES, 
   INITIAL_PAYROLL, INITIAL_PAYROLL_PERIODS, INITIAL_DEVICE_CONFIG,
@@ -169,7 +170,7 @@ export default function App() {
   useEffect(() => {
     async function loadData() {
       try {
-        const res = await fetch("/api/db/load");
+        const res = await fetch(getApiUrl("/api/db/load"));
         const json = await res.json();
         
         if (json.success && json.data) {
@@ -190,7 +191,7 @@ export default function App() {
           if (dbData.violations) setViolations(dbData.violations);
         }
 
-        const statusRes = await fetch("/api/db/status");
+        const statusRes = await fetch(getApiUrl("/api/db/status"));
         const statusJson = await statusRes.json();
         setDbStatus({
           loading: false,
@@ -219,7 +220,7 @@ export default function App() {
   const saveCollectionToServer = async (key: string, data: any) => {
     try {
       setDbStatus(prev => ({ ...prev, saving: true, savingDetails: `Menyimpan ${key}...` }));
-      const response = await fetch("/api/db/save", {
+      const response = await fetch(getApiUrl("/api/db/save"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ key, data })

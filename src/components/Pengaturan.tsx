@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { Employee, SolutionDeviceConfig } from '../types';
 import { INITIAL_SHIFTS } from '../data';
+import { getApiUrl } from '../utils';
 
 interface SettingsProps {
   onUpdateShiftConfig?: (cfg: any) => void;
@@ -91,7 +92,7 @@ export default function Pengaturan({
         database: diagConfig.database
       } : {}; // Empty payload triggers current .env testing
 
-      const res = await fetch("/api/db/ping", {
+      const res = await fetch(getApiUrl("/api/db/ping"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
