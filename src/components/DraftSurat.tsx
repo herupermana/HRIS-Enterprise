@@ -4,10 +4,11 @@ import {
   Plus, Trash2, History, Globe, RefreshCw, FileSignature, 
   Building, Check, Copy, FileSpreadsheet, Eye
 } from 'lucide-react';
-import { Employee } from '../types';
+import { Employee, SolutionDeviceConfig } from '../types';
 
 interface DraftSuratProps {
   employees: Employee[];
+  deviceConfig?: SolutionDeviceConfig;
 }
 
 interface SavedLetterDraft {
@@ -23,7 +24,7 @@ interface SavedLetterDraft {
   signatory: string;
 }
 
-export default function DraftSurat({ employees }: DraftSuratProps) {
+export default function DraftSurat({ employees, deviceConfig }: DraftSuratProps) {
   // Navigation & States
   const [selectedType, setSelectedType] = useState<'contract' | 'reference' | 'warning' | 'promotion'>('contract');
   const [selectedLanguage, setSelectedLanguage] = useState<'id' | 'en'>('id');
@@ -42,6 +43,18 @@ export default function DraftSurat({ employees }: DraftSuratProps) {
   // Authorized Signatory
   const [signatoryName, setSignatoryName] = useState('Heru Permana, S.Psi.');
   const [signatoryTitle, setSignatoryTitle] = useState('Recruitment & Employee Relations Manager');
+
+  // Load custom signatory on mount/update
+  useEffect(() => {
+    if (deviceConfig?.companyProfile) {
+      if (deviceConfig.companyProfile.signatoryName) {
+        setSignatoryName(deviceConfig.companyProfile.signatoryName);
+      }
+      if (deviceConfig.companyProfile.signatoryTitle) {
+        setSignatoryTitle(deviceConfig.companyProfile.signatoryTitle);
+      }
+    }
+  }, [deviceConfig]);
 
   // Contract specific settings
   const [contractDurationMonths, setContractDurationMonths] = useState('12');
@@ -75,6 +88,12 @@ export default function DraftSurat({ employees }: DraftSuratProps) {
 
   // References and Printable target
   const printAreaRef = useRef<HTMLDivElement>(null);
+
+  const companyName = deviceConfig?.companyProfile?.name || 'PT Enterprise Solutions';
+  const companyAddress = deviceConfig?.companyProfile?.address || 'Gedung Tech Hub, Lantai 4, Jakarta Selatan, DKI Jakarta 12920';
+  const companyPhone = deviceConfig?.companyProfile?.phone || '021-5550198';
+  const companyEmail = deviceConfig?.companyProfile?.email || 'info@enterprise-solutions.co.id';
+  const companyWebsite = deviceConfig?.companyProfile?.website || 'https://enterprise-solutions.co.id';
 
   // Helper functions to get active employee
   const activeEmployee = employees.find(e => e.id === selectedEmpId);
@@ -304,7 +323,7 @@ export default function DraftSurat({ employees }: DraftSuratProps) {
           <table style="width: 100%; font-size: 13px; margin: 12px 0;">
             <tr>
               <td style="width: 30%;"><strong>Pihak Perdana (I) :</strong></td>
-              <td><strong>PT Enterprise Solutions</strong>, beralamat di Gedung Tech Hub, Lantai 4, Jakarta Selatan, dalam hal ini diwakili oleh <strong>${signatoryName}</strong> selaku <strong>${signatoryTitle}</strong>.</td>
+              <td><strong>${companyName}</strong>, beralamat di <strong>${companyAddress}</strong>, dalam hal ini diwakili oleh <strong>${signatoryName}</strong> selaku <strong>${signatoryTitle}</strong>.</td>
             </tr>
             <tr>
               <td><strong>Pihak Kedua (II) :</strong></td>
@@ -319,7 +338,7 @@ export default function DraftSurat({ employees }: DraftSuratProps) {
             Pihak Kedua diterima bekerja untuk jangka waktu <strong>${contractDurationMonths} bulan</strong>, terhitung sejak tanggal <strong>${contractStartDate}</strong> sampai dengan ketentuan berakhirnya kontrak secara resmi. Masa percobaan ditetapkan selama <strong>${probationMonths} bulan</strong>.</p>
             
             <p><strong>Pasal 2: Hak &amp; Kompensasi Finansial</strong><br/>
-            Pihak Kedua berhak menerima Gaji Pokok sebesar <strong>${empSalaryString}</strong> per bulan beserta tunjangan kompensasi operasional resmi sesuai regulasi standard PT Enterprise Solutions.</p>
+            Pihak Kedua berhak menerima Gaji Pokok sebesar <strong>${empSalaryString}</strong> per bulan beserta tunjangan kompensasi operasional resmi sesuai regulasi standard ${companyName}.</p>
             
             <p><strong>Pasal 3: Kedisplinan &amp; Presensi</strong><br/>
             Pihak Kedua wajib mematuhi jam kerja operasional kantor dan melakukan pencatatan absensi harian melalui presensi biometric (fingerprint/portal SDK) terintegrasi.</p>
@@ -334,7 +353,7 @@ export default function DraftSurat({ employees }: DraftSuratProps) {
           <table style="width: 100%; font-size: 13px; margin: 12px 0;">
             <tr>
               <td style="width: 30%;"><strong>First Party (I):</strong></td>
-              <td><strong>PT Enterprise Solutions</strong>, located at Tech Hub Building, 4th Floor, South Jakarta, represented herein by <strong>${signatoryName}</strong> in their capacity as <strong>${signatoryTitle}</strong>.</td>
+              <td><strong>${companyName}</strong>, located at <strong>${companyAddress}</strong>, represented herein by <strong>${signatoryName}</strong> in their capacity as <strong>${signatoryTitle}</strong>.</td>
             </tr>
             <tr>
               <td><strong>Second Party (II):</strong></td>
@@ -364,7 +383,7 @@ export default function DraftSurat({ employees }: DraftSuratProps) {
     if (selectedType === 'reference') {
       if (selectedLanguage === 'id') {
         return `
-          <p>Manajemen PT Enterprise Solutions dengan ini menerangkan dan memberikan kesaksian resmi bahwa:</p>
+          <p>Manajemen <strong>${companyName}</strong> dengan ini menerangkan dan memberikan kesaksian resmi bahwa:</p>
           
           <table style="width: 100%; font-size: 13.5px; margin: 16px 0; background-color: #fafafa; border: 1px solid #e2e8f0;">
             <tr>
@@ -391,13 +410,13 @@ export default function DraftSurat({ employees }: DraftSuratProps) {
 
           <p>Ybs telah menyelesaikan masa kerjanya dengan alasan: <strong>${exitReason}</strong>.</p>
           
-          <p>Selama mengabdikan keterampilannya di PT Enterprise Solutions, <strong>${appreciationNote}</strong>. Kami mengucapkan terima kasih yang sebesar-besarnya atas segala dedikasi, kontribusi, dan loyalitas yang telah dicurahkan untuk perkembangan operasional korporasi.</p>
+          <p>Selama mengabdikan keterampilannya di <strong>${companyName}</strong>, <strong>${appreciationNote}</strong>. Kami mengucapkan terima kasih yang sebesar-besarnya atas segala dedikasi, kontribusi, dan loyalitas yang telah dicurahkan untuk perkembangan operasional korporasi.</p>
           
           <p>Semoga Surat Keterangan Kerja resmi ini bermanfaat bagi perkembangan karir profesional ybs ke depannya di tempat tugas yang baru.</p>
         `;
       } else {
         return `
-          <p>The Management in PT Enterprise Solutions hereby certifies and issues this professional testament that:</p>
+          <p>The Management in <strong>${companyName}</strong> hereby certifies and issues this professional testament that:</p>
           
           <table style="width: 100%; font-size: 13.5px; margin: 16px 0; background-color: #fafafa; border: 1px solid #e2e8f0;">
             <tr>
@@ -435,7 +454,7 @@ export default function DraftSurat({ employees }: DraftSuratProps) {
     if (selectedType === 'warning') {
       if (selectedLanguage === 'id') {
         return `
-          <p>Surat Peringatan ini dikeluarkan atas dasar evaluasi kinerja dan kepatuhan disiplin kerja staf korporasi PT Enterprise Solutions. Diterbitkan secara resmi untuk:</p>
+          <p>Surat Peringatan ini dikeluarkan atas dasar evaluasi kinerja dan kepatuhan disiplin kerja staf korporasi <strong>${companyName}</strong>. Diterbitkan secara resmi untuk:</p>
           
           <table style="width: 100%; font-size: 13px; margin: 12px 0;">
             <tr>
@@ -462,7 +481,7 @@ export default function DraftSurat({ employees }: DraftSuratProps) {
         `;
       } else {
         return `
-          <p>This Written Warning Memorandum is issued based on comprehensive behavior assessment and compliance policies of PT Enterprise Solutions. Promulgated officially to:</p>
+          <p>This Written Warning Memorandum is issued based on comprehensive behavior assessment and compliance policies of <strong>${companyName}</strong>. Promulgated officially to:</p>
           
           <table style="width: 100%; font-size: 13px; margin: 12px 0;">
             <tr>
@@ -495,7 +514,7 @@ export default function DraftSurat({ employees }: DraftSuratProps) {
       const promotionValueFormatted = formatRupiah(parseInt(salaryIncrease || '0', 10));
       if (selectedLanguage === 'id') {
         return `
-          <p>Setelah melakukan peninjauan menyeluruh terhadap kontribusi kerja, kedisiplinan absensi biometric, dan prestasi sepanjang tahun kerja berjalan, PT Enterprise Solutions dengan bangga menetapkan Surat Keputusan Promosi Jabatan untuk:</p>
+          <p>Setelah melakukan peninjauan menyeluruh terhadap kontribusi kerja, kedisiplinan absensi biometric, dan prestasi sepanjang tahun kerja berjalan, <strong>${companyName}</strong> dengan bangga menetapkan Surat Keputusan Promosi Jabatan untuk:</p>
           
           <table style="width: 100%; font-size: 13.5px; margin: 14px 0; background-color: #f8fafc; border: 1px solid #e2e8f0;">
             <tr>
@@ -524,7 +543,7 @@ export default function DraftSurat({ employees }: DraftSuratProps) {
         `;
       } else {
         return `
-          <p>Following a deliberate evaluation of work records, outstanding biometric log metrics, and performance indicators, PT Enterprise Solutions hereby issues this Promotion &amp; Assignment Directive to:</p>
+          <p>Following a deliberate evaluation of work records, outstanding biometric log metrics, and performance indicators, <strong>${companyName}</strong> hereby issues this Promotion &amp; Assignment Directive to:</p>
           
           <table style="width: 100%; font-size: 13.5px; margin: 14px 0; background-color: #f8fafc; border: 1px solid #e2e8f0;">
             <tr>
@@ -1050,9 +1069,9 @@ export default function DraftSurat({ employees }: DraftSuratProps) {
                       ES
                     </div>
                     <div className="text-left font-serif leading-tight">
-                      <h1 className="text-xl font-bold tracking-tight uppercase font-serif text-black leading-tight">PT Enterprise Solutions</h1>
+                      <h1 className="text-xl font-bold tracking-tight uppercase font-serif text-black leading-tight">{companyName}</h1>
                       <p className="text-[10px] text-gray-700 font-sans tracking-wide">Enterprise HR Services, Biometric attendance &amp; Custom Integration platform</p>
-                      <p className="text-[9px] text-gray-500 font-sans mt-0.5">Epicentre Tech Hub, L4, Jl. Rasuna Said, Jakarta Selatan &bull; Ph: (021) 8887-2115</p>
+                      <p className="text-[9px] text-gray-500 font-sans mt-0.5">{companyAddress} &bull; Ph: {companyPhone}</p>
                     </div>
                   </div>
                 </div>
@@ -1082,7 +1101,7 @@ export default function DraftSurat({ employees }: DraftSuratProps) {
                   </div>
                   <div className="text-right flex flex-col items-end">
                     <p className="mb-2">Jakarta, {letterDate}</p>
-                    <p className="mb-12 font-bold">PT Enterprise Solutions</p>
+                    <p className="mb-12 font-bold">{companyName}</p>
                     
                     {/* Tiny visual digital signed QR/seal stamp code mark */}
                     <div className="w-14 h-14 bg-stone-50 border border-stone-200/80 p-1 flex items-center justify-center my-1 select-none">

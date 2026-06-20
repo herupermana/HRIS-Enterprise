@@ -3204,6 +3204,138 @@ export default function Dashboard({
         </div>
       </motion.div>
 
+      {/* Peringatan Otomatis Kontrak Jatuh Tempo (H-30) */}
+      {(() => {
+        const expiringPKWT = expiringEmployees.filter(
+          item => item.emp.contractType !== 'Tetap' && item.diffDays <= 30 && item.diffDays >= 0
+        );
+        if (expiringPKWT.length === 0) return null;
+
+        return (
+          <motion.div
+            variants={itemVariants}
+            className="border border-rose-200 bg-gradient-to-br from-rose-50/95 to-amber-50/85 p-5 rounded-2xl shadow-xs space-y-4 relative overflow-hidden"
+            id="dashboard-contract-expiry-alert-banner"
+          >
+            {/* Visual pulsing warning glow decoration on back */}
+            <div className="absolute right-0 top-0 w-32 h-32 bg-rose-200/20 rounded-full blur-2xl pointer-events-none" />
+
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="p-2.5 bg-rose-500 text-white rounded-xl shadow-md shrink-0 flex items-center justify-center animate-pulse">
+                  <ShieldAlert className="w-5.5 h-5.5" />
+                </div>
+                <div>
+                  <h3 className="text-slate-850 text-sm font-extrabold tracking-tight flex items-center gap-2">
+                    ⚠️ Peringatan Kedaluwarsa Kontrak Kerja (H-30)
+                    <span className="bg-rose-600 text-white font-mono text-[10px] font-black px-2 py-0.5 rounded-full animate-pulse">
+                      {expiringPKWT.length} Pegawai
+                    </span>
+                  </h3>
+                  <p className="text-xs text-rose-800 font-medium leading-relaxed mt-1 max-w-2xl">
+                    Sistem mendeteksi adanya karyawan dengan status hubungan kerja PKWT (Kontrak / Magang) yang akan berakhir dalam waktu kurang dari 30 hari. Harap segera lakukan peninjauan penilaian kinerja & evaluasi perpanjangan.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => onNavigate('karyawan')}
+                  className="px-3.5 py-1.5 bg-white hover:bg-rose-50 active:bg-rose-100 text-rose-850 border border-rose-200 font-extrabold text-[10px] rounded-lg transition-all shadow-xs shrink-0 cursor-pointer flex items-center gap-1"
+                >
+                  <Users className="w-3.5 h-3.5 text-rose-600" /> Manajemen Karyawan
+                </button>
+              </div>
+            </div>
+
+            {/* Expiring Employee Cards Bento-grid style */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+              {expiringPKWT.map(({ emp, diffDays }, idx) => {
+                const isCritical = diffDays <= 7;
+                const isUrgent = diffDays <= 15;
+                const progressPercentage = Math.max(0, Math.min(100, ((30 - diffDays) / 30) * 100));
+
+                return (
+                  <div
+                    key={`banner-exp-${emp.id}-${idx}`}
+                    className="bg-white border border-rose-100 hover:border-rose-200 p-4 rounded-xl shadow-2xs transition-all flex flex-col justify-between space-y-3 relative overflow-hidden"
+                  >
+                    {/* Urgency header decoration line */}
+                    <div className={`absolute top-0 left-0 right-0 h-1 ${isCritical ? 'bg-rose-500' : isUrgent ? 'bg-amber-500' : 'bg-blue-500'}`} />
+
+                    <div>
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <h4 className="text-xs font-extrabold text-slate-850 leading-tight">{emp.name}</h4>
+                          <p className="text-[10px] text-slate-500 mt-0.5 font-medium">{emp.position} • {emp.department}</p>
+                        </div>
+                        <span className={`text-[9px] font-black tracking-wide px-1.5 py-0.5 rounded-full shrink-0 ${
+                          isCritical 
+                            ? 'bg-rose-550/10 text-rose-700 border border-rose-200' 
+                            : isUrgent 
+                            ? 'bg-amber-50 text-amber-700 border border-amber-200' 
+                            : 'bg-blue-50 text-blue-700 border border-blue-200'
+                        }`}>
+                          {diffDays === 0 ? 'Hari Ini!' : `H-${diffDays}`}
+                        </span>
+                      </div>
+
+                      {/* Progress representation to expiration */}
+                      <div className="mt-3.5 space-y-1">
+                        <div className="flex justify-between items-center text-[9px] text-slate-400 font-bold uppercase tracking-wider">
+                          <span>Sisa Kontrak: {diffDays} Hari</span>
+                          <span>Urgensi: {Math.round(progressPercentage)}%</span>
+                        </div>
+                        <div className="w-full bg-slate-100 rounded-full h-1 overflow-hidden">
+                          <div 
+                            className={`h-full rounded-full transition-all duration-500 ${
+                              isCritical ? 'bg-rose-500 animate-pulse' : isUrgent ? 'bg-amber-500' : 'bg-blue-500'
+                            }`}
+                            style={{ width: `${progressPercentage}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Meta info & direct action bar */}
+                    <div className="pt-3 border-t border-slate-50 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 text-[9px] text-slate-500 font-medium">
+                        <Calendar className="w-3 h-3 text-slate-400 shrink-0" />
+                        <span>Hingga {emp.contractEndDate}</span>
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => {
+                            setRenewalEmp(emp);
+                            setNewContractType(emp.contractType === 'Magang' ? 'Magang' : 'Kontrak');
+                            setNewDurationMonths('12');
+                            setShowRenewalModal(true);
+                          }}
+                          className="px-2 py-1 bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-[9px] rounded-md transition-all shadow-2xs cursor-pointer"
+                        >
+                          Perbarui
+                        </button>
+                        <button
+                          onClick={() => {
+                            setPreviewSkEmp(emp);
+                            setIsSkDownloaded(false);
+                          }}
+                          className="p-1 px-1.5 border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-md text-[9px] font-bold cursor-pointer"
+                          title="Tinjau draft SK Perjanjian Kerja"
+                        >
+                          <FileText className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </motion.div>
+        );
+      })()}
+
       {/* ================= SMART LAYOUT CONTROL PANEL ================= */}
       <motion.div
         variants={itemVariants}
@@ -5509,7 +5641,7 @@ export default function Dashboard({
                   Belum ada aliran aktivitas tercatat. Lakukan transaksi data.
                 </div>
               ) : (
-                recentHrLogs.map((log) => {
+                recentHrLogs.map((log, idx) => {
                   // Setup custom color styles for modules
                   const bubbleBgMap: Record<string, string> = {
                     'Karyawan': 'bg-blue-500',
@@ -5521,7 +5653,7 @@ export default function Dashboard({
                   const color = bubbleBgMap[log.module] || 'bg-slate-400';
 
                   return (
-                    <div key={log.id} className="flex gap-3 text-xs items-start relative z-10 pr-1 group" id={`stream-item-${log.id}`}>
+                    <div key={`stream-${log.id}-${idx}`} className="flex gap-3 text-xs items-start relative z-10 pr-1 group" id={`stream-item-${log.id}`}>
                       {/* Timeline Dot with matching module color */}
                       <div className="flex-none mt-1">
                         <div className={`w-3.5 h-3.5 rounded-full ring-4 ring-white ${color} group-hover:scale-110 transition-transform`} />
@@ -5582,11 +5714,11 @@ export default function Dashboard({
                   Belum ada log masuk hari ini. Tarik data dari mesin absensi.
                 </div>
               ) : (
-                recentLogs.map((log) => {
+                recentLogs.map((log, idx) => {
                   const emp = employees.find(e => e.id === log.employeeId);
                   
                   return (
-                    <div key={log.id} className="flex gap-3 text-xs leading-5" id={`recent-log-${log.id}`}>
+                    <div key={`recent-${log.id}-${idx}`} className="flex gap-3 text-xs leading-5" id={`recent-log-${log.id}`}>
                       <div className="relative flex-none">
                         {emp?.photoUrl ? (
                           <img 
@@ -5817,24 +5949,24 @@ export default function Dashboard({
                   </td>
                 </tr>
               ) : (
-                filteredLogs.slice(0, visibleLogCount).map((log) => {
+                filteredLogs.slice(0, visibleLogCount).map((log, idx) => {
                   const moduleStyles: Record<string, string> = {
                     'Karyawan': 'bg-blue-50 text-blue-700 border-blue-100/60',
                     'Penggajian': 'bg-emerald-50 text-emerald-700 border-emerald-100/60',
-                    'Absensi': 'bg-indigo-50 text-indigo-700 border-indigo-100/60',
+                    'Absensi': 'bg-indigo-55 text-indigo-700 border-indigo-100/60',
                     'Cuti/Izin': 'bg-amber-50 text-amber-700 border-amber-100/60',
-                    'Konfigurasi': 'bg-violet-50 text-violet-700 border-violet-100/60',
+                    'Konfigurasi': 'bg-violet-55 text-violet-700 border-violet-100/60',
                     'Dashboard': 'bg-slate-55 text-slate-700 border-slate-200',
                   };
 
                   const statusStyles = {
-                    'Sukses': 'bg-emerald-500/10 text-emerald-600 border border-emerald-550/15',
-                    'Info': 'bg-blue-500/10 text-blue-600 border border-blue-550/15',
-                    'Peringatan': 'bg-rose-500/10 text-rose-600 border border-rose-550/15',
+                    'Sukses': 'bg-emerald-500/10 text-emerald-600 border border-emerald-555/15',
+                    'Info': 'bg-blue-500/10 text-blue-600 border border-blue-555/15',
+                    'Peringatan': 'bg-rose-500/10 text-rose-600 border border-rose-555/15',
                   };
 
                   return (
-                    <tr key={log.id} className="hover:bg-slate-50/50 transition-colors">
+                    <tr key={`audit-log-${log.id}-${idx}`} className="hover:bg-slate-50/50 transition-colors">
                       <td className="py-3 px-4 text-slate-450 font-mono text-[10.5px] whitespace-nowrap">
                         {log.timestamp}
                       </td>
@@ -6304,7 +6436,7 @@ export default function Dashboard({
             {/* List of Pending Leave requests */}
             <div className="max-h-64 overflow-y-auto divide-y divide-slate-800/50 p-3 space-y-2.5">
               {pendingHrdLeaves.map((leave, idx) => (
-                <div key={leave.id} className="pt-2 px-1 first:pt-0 space-y-1.5" id={`leave-toast-item-${leave.id}`}>
+                <div key={`toast-leave-${leave.id}-${idx}`} className="pt-2 px-1 first:pt-0 space-y-1.5" id={`leave-toast-item-${leave.id}`}>
                   <div className="flex justify-between items-start">
                     <div>
                       <span className="text-[11px] font-black text-white block leading-snug">{leave.employeeName}</span>

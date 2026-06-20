@@ -97,6 +97,19 @@ export interface PayrollRecord {
   approvedByHR?: string;
 }
 
+export interface CompanyProfile {
+  name: string;
+  address: string;
+  phone: string;
+  email: string;
+  website: string;
+  industry: string;
+  registrationNumber?: string;
+  logoUrl?: string;
+  signatoryName?: string;
+  signatoryTitle?: string;
+}
+
 export interface SolutionDeviceConfig {
   ipAddress: string;
   port: number;
@@ -107,6 +120,7 @@ export interface SolutionDeviceConfig {
   syncIntervalHours: number;
   lastSyncTime?: string;
   enabledModules?: Record<string, boolean>;
+  companyProfile?: CompanyProfile;
 }
 
 export interface RawFingerprintLog {

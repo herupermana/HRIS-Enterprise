@@ -111,13 +111,27 @@ export default function Pengaturan({
   };
 
   // General company state
-  const [companyProfile, setCompanyProfile] = useState({
-    name: 'PT ENTERPRISE SOLUTIONS INDONESIA',
-    address: 'Gedung Biometrik Suite Lt. 5, Jl. Jend. Sudirman No. 12, Jakarta Selatan, 12190',
-    phone: '(021) 555-1234',
-    email: 'hrd@enterprise.co.id',
-    timezone: 'WIB (UTC+07:00)'
+  const [companyProfile, setCompanyProfile] = useState(() => {
+    return deviceConfig?.companyProfile || {
+      name: 'PT Enterprise Solutions',
+      address: 'Gedung Tech Hub, Lantai 4, Jakarta Selatan, DKI Jakarta 12920',
+      phone: '021-5550198',
+      email: 'info@enterprise-solutions.co.id',
+      website: 'https://enterprise-solutions.co.id',
+      industry: 'Teknologi Informasi & Solusi Integrator',
+      registrationNumber: 'AHU-0019283-AH.01.01.2024',
+      signatoryName: 'Hendra Wijaya, M.T.',
+      signatoryTitle: 'Direktur Utama',
+      timezone: 'WIB (UTC+07:00)'
+    };
   });
+
+  // Synchronize when remote config loads
+  React.useEffect(() => {
+    if (deviceConfig?.companyProfile) {
+      setCompanyProfile(deviceConfig.companyProfile);
+    }
+  }, [deviceConfig?.companyProfile]);
 
   const handleSaveSettings = (e: React.FormEvent) => {
     e.preventDefault();
@@ -128,14 +142,15 @@ export default function Pengaturan({
     if (onUpdateDeviceConfig && deviceConfig) {
       onUpdateDeviceConfig({
         ...deviceConfig,
-        enabledModules: localModules
+        enabledModules: localModules,
+        companyProfile: companyProfile
       });
       // Also trigger a custom log for administrative trace
       window.dispatchEvent(new CustomEvent('hris_add_audit_log', {
         detail: {
           module: 'Konfigurasi',
-          action: 'Ubah Konfigurasi Modul',
-          details: 'Melakukan penyesuaian daftar modul aktif sistem HRIS.',
+          action: 'Ubah Profil Perusahaan',
+          details: `Melakukan pembaruan data profil organisasi ${companyProfile.name} secara aman di server database.`,
           status: 'Sukses'
         }
       }));
@@ -225,44 +240,105 @@ export default function Pengaturan({
               <MapPin className="w-4.5 h-4.5 text-blue-600" /> Profil Badan Organisasi / Perusahaan
             </h4>
 
-            <div className="space-y-3.5 text-xs font-semibold">
-              <div>
-                <label className="block text-slate-500 font-medium mb-1">Nama Badan Hukum / Perusahaan</label>
-                <input 
-                  type="text" 
-                  value={companyProfile.name}
-                  onChange={(e) => setCompanyProfile({ ...companyProfile, name: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-lg text-slate-800"
-                />
+            <div className="space-y-4 text-xs font-semibold">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-slate-500 font-medium mb-1">Nama Badan Hukum / Perusahaan *</label>
+                  <input 
+                    type="text" 
+                    value={companyProfile.name}
+                    onChange={(e) => setCompanyProfile({ ...companyProfile, name: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-lg text-slate-800 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:bg-white"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-500 font-medium mb-1">Sektor Bidang Usaha / Industri</label>
+                  <input 
+                    type="text" 
+                    value={companyProfile.industry || ''}
+                    onChange={(e) => setCompanyProfile({ ...companyProfile, industry: e.target.value })}
+                    placeholder="Contoh: Teknologi Informasi & Integrasi"
+                    className="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-lg text-slate-800 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:bg-white"
+                  />
+                </div>
               </div>
 
               <div>
-                <label className="block text-slate-500 font-medium mb-1">Alamat Resmi Kantor Utama</label>
+                <label className="block text-slate-500 font-medium mb-1">Alamat Resmi Kantor Utama *</label>
                 <textarea 
                   rows={2}
                   value={companyProfile.address}
                   onChange={(e) => setCompanyProfile({ ...companyProfile, address: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-lg text-slate-800 font-medium select-none"
+                  className="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-lg text-slate-800 font-medium focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:bg-white"
+                  required
                 />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-slate-500 font-medium mb-1">Nomor Telepon Kantor</label>
+                  <label className="block text-slate-500 font-medium mb-1">Nomor Telepon Kantor *</label>
                   <input 
                     type="text" 
                     value={companyProfile.phone}
                     onChange={(e) => setCompanyProfile({ ...companyProfile, phone: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-lg text-slate-800"
+                    className="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-lg text-slate-800 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:bg-white"
+                    required
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-500 font-medium mb-1">Alamat Email HRD</label>
+                  <label className="block text-slate-500 font-medium mb-1">Alamat Email Korespondensi *</label>
                   <input 
                     type="email" 
                     value={companyProfile.email}
                     onChange={(e) => setCompanyProfile({ ...companyProfile, email: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-lg text-slate-800"
+                    className="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-lg text-slate-800 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:bg-white"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-500 font-medium mb-1">Situs Web / Website</label>
+                  <input 
+                    type="text" 
+                    value={companyProfile.website || ''}
+                    onChange={(e) => setCompanyProfile({ ...companyProfile, website: e.target.value })}
+                    placeholder="https://perusahaan.co.id"
+                    className="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-lg text-slate-800 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:bg-white"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
+                <div>
+                  <label className="block text-slate-500 font-medium mb-1">Nomor Legalitas / NIB / AHU</label>
+                  <input 
+                    type="text" 
+                    value={companyProfile.registrationNumber || ''}
+                    onChange={(e) => setCompanyProfile({ ...companyProfile, registrationNumber: e.target.value })}
+                    placeholder="AHU-00123.AH.01.2024"
+                    className="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-lg text-slate-800 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-500 font-medium mb-1">Nama Pejabat Penandatangan *</label>
+                  <input 
+                    type="text" 
+                    value={companyProfile.signatoryName || ''}
+                    onChange={(e) => setCompanyProfile({ ...companyProfile, signatoryName: e.target.value })}
+                    placeholder="Contoh: Heru Permana, S.Psi."
+                    className="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-lg text-slate-800 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:bg-white"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-500 font-medium mb-1">Jabatan Resmi Pejabat *</label>
+                  <input 
+                    type="text" 
+                    value={companyProfile.signatoryTitle || ''}
+                    onChange={(e) => setCompanyProfile({ ...companyProfile, signatoryTitle: e.target.value })}
+                    placeholder="Contoh: Direktur Utama"
+                    className="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-lg text-slate-800 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:bg-white"
+                    required
                   />
                 </div>
               </div>

@@ -6,7 +6,7 @@ import {
   Laptop, FolderOpen, Award
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Employee, AttendanceRecord, LeaveRequest, PayrollPeriod, PayrollRecord, SalaryHistoryRecord, Holiday, Announcement, CompanyAsset } from '../types';
+import { Employee, AttendanceRecord, LeaveRequest, PayrollPeriod, PayrollRecord, SalaryHistoryRecord, Holiday, Announcement, CompanyAsset, SolutionDeviceConfig } from '../types';
 
 interface PortalKaryawanProps {
   employees: Employee[];
@@ -21,6 +21,7 @@ interface PortalKaryawanProps {
   announcements: Announcement[];
   onMarkAnnouncementAsRead: (id: string, employeeId: string) => void;
   assets: CompanyAsset[];
+  deviceConfig?: SolutionDeviceConfig;
 }
 
 export default function PortalKaryawan({
@@ -35,7 +36,8 @@ export default function PortalKaryawan({
   holidays,
   announcements,
   onMarkAnnouncementAsRead,
-  assets
+  assets,
+  deviceConfig
 }: PortalKaryawanProps) {
   // Authentication stats
   const [authToken, setAuthToken] = useState<string>('');
@@ -585,7 +587,7 @@ export default function PortalKaryawan({
 
             <div className="p-4 border-t border-slate-800 bg-slate-950/40 text-[10px] text-slate-500 leading-normal space-y-1">
               <p className="font-extrabold text-slate-400">Portal Karyawan v1.0.2</p>
-              <p>PT Enterprise Solutions</p>
+              <p>{deviceConfig?.companyProfile?.name || 'PT Enterprise Solutions'}</p>
               <div className="flex items-center gap-1.5 text-rose-500/80 mt-1.5 font-semibold">
                 <ShieldCheck className="w-3.5 h-3.5 shrink-0" /> Token Keamanan Aktif
               </div>
@@ -935,9 +937,9 @@ export default function PortalKaryawan({
                         {/* Letter Header */}
                         <div className="flex justify-between items-start border-b-2 border-slate-900 pb-4">
                           <div>
-                            <h4 className="text-base font-extrabold uppercase tracking-tight text-slate-900">PT Enterprise Solutions</h4>
-                            <p className="text-[9px] text-slate-500 leading-normal">Gedung Wisma Teknologi, Lt. 8 • Jakarta Selatan, DKI Jakarta</p>
-                            <p className="text-[9px] text-slate-400 mt-0.5">Sistem Penggajian Solution X-100C Biometric Bridge</p>
+                            <h4 className="text-base font-extrabold uppercase tracking-tight text-slate-900">{deviceConfig?.companyProfile?.name || 'PT Enterprise Solutions'}</h4>
+                            <p className="text-[9px] text-slate-500 leading-normal">{deviceConfig?.companyProfile?.address || 'Gedung Wisma Teknologi, Lt. 8 • Jakarta Selatan, DKI Jakarta'}</p>
+                            <div className="text-[9px] text-slate-400 mt-0.5">Sistem Penggajian Solution X-100C Biometric Bridge</div>
                           </div>
                           <div className="text-right text-xs">
                             <span className="font-extrabold text-[#64748B] block tracking-widest text-[9px]">OFFICIAL RECEIPT</span>
@@ -1043,8 +1045,8 @@ export default function PortalKaryawan({
 
                         {/* Footnotes disclosures */}
                         <div className="pt-4 border-t border-slate-200 text-[8.5px] text-slate-400 leading-normal flex justify-between items-center">
-                          <p>Dokumen ini diterbitkan secara elektronik oleh sistem PT Enterprise Solutions HRIS Biometric Bridge.<br />Sah tanpa tanda tangan basah fisik.</p>
-                          <p className="text-right font-semibold font-mono font-mono uppercase tracking-wider text-rose-700">STATUS: {activePayroll.payoutStatus}</p>
+                          <p>Dokumen ini diterbitkan secara elektronik oleh sistem {deviceConfig?.companyProfile?.name || 'PT Enterprise Solutions'} HRIS Biometric Bridge.<br />Sah tanpa tanda tangan basah fisik.</p>
+                          <p className="text-right font-semibold font-mono uppercase tracking-wider text-rose-700">STATUS: {activePayroll.payoutStatus}</p>
                         </div>
                       </div>
 

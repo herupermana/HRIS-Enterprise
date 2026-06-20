@@ -968,6 +968,7 @@ export default function App() {
             holidays={holidays}
             announcements={announcements}
             assets={assets}
+            deviceConfig={deviceConfig}
             onMarkAnnouncementAsRead={handleMarkAnnouncementAsRead}
             onAddLeaveRequest={(newLeave) => {
               setLeaves(prev => [newLeave, ...prev]);
@@ -1380,7 +1381,7 @@ export default function App() {
                   initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
                   transition={{ duration: 0.15 }}
                 >
-                  <DraftSurat employees={filteredEmployeesForView} />
+                  <DraftSurat employees={filteredEmployeesForView} deviceConfig={deviceConfig} />
                 </motion.div>
               )}
 

@@ -185,6 +185,17 @@ export const INITIAL_DEVICE_CONFIG: SolutionDeviceConfig = {
     'draft-surat': true,
     komunikasi: true,
     'manajemen-user': true
+  },
+  companyProfile: {
+    name: 'PT Enterprise Solutions',
+    address: 'Gedung Tech Hub, Lantai 4, Jakarta Selatan, DKI Jakarta 12920',
+    phone: '021-5550198',
+    email: 'info@enterprise-solutions.co.id',
+    website: 'https://enterprise-solutions.co.id',
+    industry: 'Teknologi Informasi & Solusi Integrator',
+    registrationNumber: 'AHU-0019283-AH.01.01.2024',
+    signatoryName: 'Hendra Wijaya, M.T.',
+    signatoryTitle: 'Direktur Utama'
   }
 };
 
