@@ -884,6 +884,14 @@ export default function App() {
   ];
 
   const menuItems = allMenuItems.filter(item => {
+    // Check if module is disabled globally under Module Configuration
+    const isModuleDisabled = deviceConfig?.enabledModules && deviceConfig.enabledModules[item.id] === false;
+    
+    // Safety check: Dashboard, Aturan Kerja & Manajemen Akses are essential core modules
+    if (isModuleDisabled && item.id !== 'dashboard' && item.id !== 'pengaturan' && item.id !== 'manajemen-user') {
+      return false;
+    }
+
     if (activeUser.role === 'Super Admin' || activeUser.role === 'HR Manager') return true;
     if (activeUser.role === 'Division Manager') {
       return ['dashboard', 'karyawan', 'payroll', 'cuti', 'manajemen-user'].includes(item.id);
@@ -1418,6 +1426,8 @@ export default function App() {
                     displayDensity={displayDensity}
                     onChangeDisplayDensity={setDisplayDensity}
                     dbStatus={dbStatus}
+                    deviceConfig={deviceConfig}
+                    onUpdateDeviceConfig={(cfg) => setDeviceConfig(cfg)}
                   />
                 </motion.div>
               )}

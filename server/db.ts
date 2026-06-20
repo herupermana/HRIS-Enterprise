@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import mysql, { Connection } from "mysql2/promise";
+import mysql, { Pool } from "mysql2/promise";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -12,8 +12,8 @@ if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
-// Global DB connection
-let dbConnection: Connection | null = null;
+// Global DB connection pool
+let dbPool: Pool | null = null;
 let useMySQL = false;
 
 // Check which collections we need to manage
@@ -34,31 +34,103 @@ const COLLECTION_KEYS = [
   "violations"
 ];
 
-// Initialize DB (attempt MySQL, fallback to files)
+// Helper to write/persist verified connection configs back into security env
+function saveEnvConfig(config: {
+  host: string;
+  port: number;
+  user: string;
+  password?: string;
+  database: string;
+}) {
+  try {
+    const envPath = path.join(process.cwd(), ".env");
+    let content = "";
+    if (fs.existsSync(envPath)) {
+      content = fs.readFileSync(envPath, "utf-8");
+    }
+
+    const updates = {
+      DB_HOST: config.host,
+      DB_PORT: String(config.port),
+      DB_USER: config.user,
+      DB_PASSWORD: config.password || "",
+      DB_NAME: config.database
+    };
+
+    let lines = content.split("\n");
+    for (const [key, value] of Object.entries(updates)) {
+      let replaced = false;
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].startsWith(`${key}=`)) {
+          lines[i] = `${key}=${value}`;
+          replaced = true;
+          break;
+        }
+      }
+      if (!replaced) {
+        lines.push(`${key}=${value}`);
+      }
+    }
+
+    fs.writeFileSync(envPath, lines.join("\n"), "utf-8");
+    console.log("💾 Berhasil menyimpan konfigurasi .env yang terverifikasi.");
+  } catch (err: any) {
+    console.error("❌ Gagal menyimpan konfigurasi .env:", err.message);
+  }
+}
+
+// Initialize DB (attempt MySQL pool, fallback to files)
 export async function initializeDatabase() {
+  // Dynamically re-read .env config
+  try {
+    dotenv.config({ path: path.join(process.cwd(), ".env"), override: true });
+  } catch (err: any) {
+    console.warn("Gagal merelasikan konfigurasi aktual .env:", err.message);
+  }
+
   const host = process.env.DB_HOST;
   const user = process.env.DB_USER;
   const password = process.env.DB_PASSWORD;
   const database = process.env.DB_NAME;
   const port = process.env.DB_PORT ? parseInt(process.env.DB_PORT) : 3306;
 
-  if (host && user && database) {
+  // Detect whether it remains a placeholder
+  const isPlaceholder = !host || 
+    host === "127.0.0.1" && (
+      user?.includes("ganti_dengan") || 
+      password?.includes("ganti_dengan") || 
+      database?.includes("ganti_dengan")
+    );
+
+  if (host && user && database && !isPlaceholder) {
     console.log(`🔌 Mencoba menghubungkan ke database MySQL (${host}:${port}, database: ${database})...`);
     try {
-      dbConnection = await mysql.createConnection({
+      if (dbPool) {
+        await dbPool.end().catch(() => {});
+      }
+
+      dbPool = mysql.createPool({
         host,
         user,
         password,
         database,
         port,
-        connectTimeout: 5000
+        waitForConnections: true,
+        connectionLimit: 15,
+        queueLimit: 0,
+        connectTimeout: 5000,
+        enableKeepAlive: true,
+        keepAliveInitialDelay: 10000
       });
+
+      // Simple probe query
+      await dbPool.query("SELECT 1");
       useMySQL = true;
-      console.log("✅ Berhasil terhubung ke database MySQL!");
+      console.log("✅ Berhasil terhubung ke database MySQL via pooling!");
 
       // Create a persistent table to store each collection as JSON to ensure maximum safety,
       // flexibility, and zero risk of migrations crashing the production server on schema updates.
-      await dbConnection.query(`
+      await dbPool.query(`
         CREATE TABLE IF NOT EXISTS hris_collections (
           id VARCHAR(100) PRIMARY KEY,
           data_json LONGTEXT NOT NULL,
@@ -70,11 +142,13 @@ export async function initializeDatabase() {
       console.error("❌ Gagal terhubung ke MySQL pada rintisan start:", error.message);
       console.log("⚠️ Menggunakan File-system JSON Database fallback (Data disimpan lokal di file /data/*.json) untuk stabilitas server.");
       useMySQL = false;
+      dbPool = null;
     }
   } else {
-    console.log("ℹ️ Variabel lingkungan MySQL belum dikonfigurasi di file .env.");
+    console.log("ℹ️ Variabel lingkungan MySQL belum dikonfigurasi nyata di file .env.");
     console.log("💾 Menggunakan File-system JSON Database fallback.");
     useMySQL = false;
+    dbPool = null;
   }
 }
 
@@ -82,16 +156,21 @@ export async function initializeDatabase() {
 export async function loadHrisData() {
   const data: Record<string, any> = {};
 
+  // Lazily probe database on dynamic load if not already connected
+  if (!useMySQL) {
+    await initializeDatabase();
+  }
+
   for (const key of COLLECTION_KEYS) {
     let loaded = false;
 
-    if (useMySQL && dbConnection) {
+    if (useMySQL && dbPool) {
       try {
-        const [rows]: any = await dbConnection.query(
+        const [rows]: any = await dbPool.query(
           "SELECT data_json FROM hris_collections WHERE id = ?",
           [key]
         );
-        if (rows.length > 0) {
+        if (rows && rows.length > 0) {
           data[key] = JSON.parse(rows[0].data_json);
           loaded = true;
         }
@@ -130,20 +209,33 @@ export async function saveHrisCollection(key: string, items: any) {
     console.error(`❌ Gagal mencadangkan koleksi "${key}" ke disk:`, err.message);
   }
 
+  // Double-check if we need database probe
+  if (!useMySQL) {
+    await initializeDatabase();
+  }
+
   // Save to MySQL if active
-  if (useMySQL && dbConnection) {
+  if (useMySQL && dbPool) {
     try {
       const dataStr = JSON.stringify(items);
-      await dbConnection.query(
+      await dbPool.query(
         "INSERT INTO hris_collections (id, data_json) VALUES (?, ?) ON DUPLICATE KEY UPDATE data_json = ?",
         [key, dataStr, dataStr]
       );
     } catch (error: any) {
       console.error(`❌ Gagal menyimpan koleksi "${key}" ke MySQL:`, error.message);
-      // Attempt reconnection if broken
+      useMySQL = false;
+      // Attempt quick reconnection
       try {
         console.log("🔄 Mencoba menghubungkan kembali ke MySQL...");
         await initializeDatabase();
+        if (useMySQL && dbPool) {
+          const dataStr = JSON.stringify(items);
+          await dbPool.query(
+            "INSERT INTO hris_collections (id, data_json) VALUES (?, ?) ON DUPLICATE KEY UPDATE data_json = ?",
+            [key, dataStr, dataStr]
+          );
+        }
       } catch (reconnectErr) {
         // Silently swallow reconnect errors here to avoid crashing active requests
       }
@@ -181,7 +273,7 @@ export async function pingDatabase(customConfig?: {
       code: "MISSING_ENV_CONFIG",
       message: "Konfigurasi database belum lengkap di file .env Anda.",
       details: "Periksa .env untuk memastikan DB_HOST, DB_USER, dan DB_NAME sudah diisi.",
-      solution: "Silakan edit file .env di folder project Anda melalui aaPanel File Manager / Terminal."
+      solution: "Silakan masukkan kredensial baru melalui panel uji di atas untuk langsung mengupdate otomatis file .env!"
     };
   }
 
@@ -199,11 +291,27 @@ export async function pingDatabase(customConfig?: {
     await conn.query("SELECT 1");
     await conn.end();
 
+    // SUCCESS! If this was a custom user-submitted configuration, update the .env file and active pool live!
+    if (customConfig && customConfig.host && customConfig.user && customConfig.database) {
+      saveEnvConfig({
+        host: customConfig.host,
+        port,
+        user: customConfig.user,
+        password: customConfig.password,
+        database: customConfig.database
+      });
+      // Re-initialize active pool immediately so everything starts saving directly!
+      await initializeDatabase();
+    } else {
+      // If of current .env and success, make sure useMySQL is active
+      useMySQL = true;
+    }
+
     return {
       success: true,
       message: "Sukses! Koneksi ke server MySQL berhasil dibuat dan diverifikasi.",
       details: `Berhasil terhubung ke host '${host}' pada port ${port} menggunakan user '${user}'`,
-      solution: "Koneksi database Anda berjalan 100% normal dan siap menyinkronkan data HRIS!"
+      solution: "Koneksi database Anda berjalan 100% normal dan siap menyinkronkan seluruh data HRIS Anda secara instan!"
     };
   } catch (error: any) {
     console.error("Diagnostic Ping Failed:", error);
@@ -219,19 +327,19 @@ export async function pingDatabase(customConfig?: {
     } else if (errCode === "ER_ACCESS_DENIED_ERROR") {
       message = "Kredensial Salah (Access Denied)";
       details = `Username atau password untuk akun '${user}' ditolak oleh MySQL server.`;
-      solution = "Periksa kembali ejaan username dan password yang tercantum di file .env. Anda bisa melihat/mereset password database ini langsung melalui Tab 'Database' di aaPanel.";
+      solution = "Periksa kembali ejaan username dan password yang dimasukkan. Anda bisa melihat/mereset password database ini langsung melalui Tab 'Database' di aaPanel.";
     } else if (errCode === "ER_BAD_DB_ERROR") {
       message = "Database Tidak Ditemukan (Bad Database)";
       details = `Koneksi berhasil ke MySQL, namun database dengan nama '${database}' tidak ada.`;
-      solution = "Pastikan nama database di file .env sama persis dengan database yang Anda tambahkan di aaPanel. Anda dapat menambahkan database baru dengan nama ini melalui menu 'Database > Add Database' di aaPanel.";
+      solution = "Pastikan nama database sama persis dengan database yang Anda tambahkan di aaPanel. Anda dapat menambahkan database baru dengan nama ini melalui menu 'Database > Add Database' di aaPanel.";
     } else if (errCode === "ENOTFOUND") {
       message = "Host Tidak Ditemukan (DNS Error/ENOTFOUND)";
       details = `Alamat host '${host}' tidak dapat diselesaikan atau tidak terdaftar dalam jaringan server.`;
-      solution = "Jika MySQL berada di VPS yang sama, gunakan '127.0.0.1' atau 'localhost' sebagai DB_HOST Anda untuk rute tercepat dan teraman.";
+      solution = "Jika MySQL berada di VPS yang sama, gunakan IP Publik VPS Anda (misalnya IP hrispwk.ideabuabu.web.id) agar server eksternal ini bisa menjangkaunya.";
     } else if (errCode === "ETIMEDOUT") {
       message = "Waktu Koneksi Habis (ETIMEDOUT)";
       details = `Mencoba menghubungi ${host} tetapi tidak ada respons dalam batas waktu yang ditentukan.`;
-      solution = "Ini biasanya disebabkan oleh pemblokiran port 3306 oleh firewall. Periksa tab Security di aaPanel, atau setelan firewall penyedia VPS Anda (misalnya Alibaba Cloud, AWS, DigitalOcean) untuk mengizinkan lalu lintas masuk.";
+      solution = "Ini biasanya disebabkan oleh pemblokiran port 3306 oleh firewall. Periksa tab Security di aaPanel, atau setelan firewall penyedia VPS/Cloud Anda (misalnya Alibaba Cloud, AWS, DigitalOcean) untuk mengizinkan lalu lintas masuk dari luar.";
     }
 
     return {

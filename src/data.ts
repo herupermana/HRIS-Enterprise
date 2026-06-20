@@ -173,7 +173,19 @@ export const INITIAL_DEVICE_CONFIG: SolutionDeviceConfig = {
   status: 'Terkoneksi',
   autoSync: true,
   syncIntervalHours: 4,
-  lastSyncTime: '2026-06-11 17:05:00'
+  lastSyncTime: '2026-06-11 17:05:00',
+  enabledModules: {
+    dashboard: true,
+    karyawan: true,
+    absensi: true,
+    payroll: true,
+    cuti: true,
+    pelanggaran: true,
+    inventaris: true,
+    'draft-surat': true,
+    komunikasi: true,
+    'manajemen-user': true
+  }
 };
 
 // Raw log examples to copy/paste in Indonesian web simulator for X-100C dat pull.

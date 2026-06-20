@@ -106,6 +106,7 @@ export interface SolutionDeviceConfig {
   autoSync: boolean;
   syncIntervalHours: number;
   lastSyncTime?: string;
+  enabledModules?: Record<string, boolean>;
 }
 
 export interface RawFingerprintLog {

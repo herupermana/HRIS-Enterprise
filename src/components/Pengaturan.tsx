@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Sliders, Shield, Landmark, MapPin, 
-  HelpCircle, Settings, CheckCircle, RefreshCw, Clock, Database, Server
+  HelpCircle, Settings, CheckCircle, RefreshCw, Clock, Database, Server,
+  Users, Coins, Calendar, ShieldAlert, ShoppingBag, FileText, Megaphone, LayoutGrid
 } from 'lucide-react';
-import { Employee } from '../types';
+import { Employee, SolutionDeviceConfig } from '../types';
 import { INITIAL_SHIFTS } from '../data';
 
 interface SettingsProps {
@@ -19,18 +20,45 @@ interface SettingsProps {
     saving: boolean;
     savingDetails: string | null;
   };
+  deviceConfig: SolutionDeviceConfig;
+  onUpdateDeviceConfig: (cfg: SolutionDeviceConfig) => void;
 }
 
 export default function Pengaturan({ 
   onUpdateShiftConfig, 
   displayDensity = 'lapang', 
   onChangeDisplayDensity,
-  dbStatus
+  dbStatus,
+  deviceConfig,
+  onUpdateDeviceConfig
   }: SettingsProps) {
   const [shiftState, setShiftState] = useState(INITIAL_SHIFTS);
   const [isSaved, setIsSaved] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
   const [showDiagnostic, setShowDiagnostic] = useState(false);
+
+  // Local state for active modules
+  const [localModules, setLocalModules] = useState<Record<string, boolean>>(() => {
+    return deviceConfig?.enabledModules || {
+      dashboard: true,
+      karyawan: true,
+      absensi: true,
+      payroll: true,
+      cuti: true,
+      pelanggaran: true,
+      inventaris: true,
+      'draft-surat': true,
+      komunikasi: true,
+      'manajemen-user': true
+    };
+  });
+
+  // Synchronize when remote config loads
+  React.useEffect(() => {
+    if (deviceConfig?.enabledModules) {
+      setLocalModules(deviceConfig.enabledModules);
+    }
+  }, [deviceConfig?.enabledModules]);
 
   // States for live interactive database ping & troubleshooting
   const [diagTesting, setDiagTesting] = useState(false);
@@ -96,6 +124,21 @@ export default function Pengaturan({
     setIsSaved(true);
     if (onUpdateShiftConfig) {
       onUpdateShiftConfig(shiftState);
+    }
+    if (onUpdateDeviceConfig && deviceConfig) {
+      onUpdateDeviceConfig({
+        ...deviceConfig,
+        enabledModules: localModules
+      });
+      // Also trigger a custom log for administrative trace
+      window.dispatchEvent(new CustomEvent('hris_add_audit_log', {
+        detail: {
+          module: 'Konfigurasi',
+          action: 'Ubah Konfigurasi Modul',
+          details: 'Melakukan penyesuaian daftar modul aktif sistem HRIS.',
+          status: 'Sukses'
+        }
+      }));
     }
     setTimeout(() => setIsSaved(false), 3000);
   };
@@ -222,6 +265,153 @@ export default function Pengaturan({
                     className="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-lg text-slate-800"
                   />
                 </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Module Configuration Settings */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4" id="module-config-card">
+            <h4 className="text-sm font-semibold text-slate-850 tracking-tight flex items-center gap-1.5 pb-2 border-b border-slate-100">
+              <LayoutGrid className="w-4.5 h-4.5 text-blue-600" /> Konfigurasi Aktif Modul HRIS
+            </h4>
+            <p className="text-[10px] text-slate-450 leading-relaxed font-normal">
+              Aktifkan atau nonaktifkan modul di bawah ini secara dinamis. Modul yang dinonaktifkan akan disembunyikan secara global dari bilah navigasi utama dan hak akses pengguna di seluruh portal sistem HRIS.
+            </p>
+
+            <div className="space-y-3.5">
+              {[
+                {
+                  id: 'karyawan',
+                  title: 'Data Karyawan',
+                  desc: 'Manajemen biodata, departemen, histori penyesuaian gaji, serta kontrak kerja/mutasi.',
+                  icon: Users,
+                  colorClass: 'text-blue-600 bg-blue-50 dark:bg-blue-950/20'
+                },
+                {
+                  id: 'absensi',
+                  title: 'Tarik Absen Solution X-100C',
+                  desc: 'Integrasi & penarikan otomatis atau manual log sidik jari dari mesin absensi Solution X-100C.',
+                  icon: Clock,
+                  colorClass: 'text-amber-600 bg-amber-50 dark:bg-amber-950/20'
+                },
+                {
+                  id: 'payroll',
+                  title: 'Slip Penggajian',
+                  desc: 'Kalkulasi otomatis iuran BPJS, PPh21, klaim lembur, dan distribusi digital slip gaji karyawan.',
+                  icon: Coins,
+                  colorClass: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/20'
+                },
+                {
+                  id: 'cuti',
+                  title: 'Cuti & Permisi',
+                  desc: 'Formulir pengajuan dispensasi izin, sakit, dan cuti tahunan terintegrasi dengan persetujuan bertingkat.',
+                  icon: Calendar,
+                  colorClass: 'text-indigo-600 bg-indigo-50 dark:bg-indigo-950/20'
+                },
+                {
+                  id: 'pelanggaran',
+                  title: 'Manajemen Pelanggaran',
+                  desc: 'Pencatatan surat peringatan karyawan (SP-1, SP-2, SP-3) dan denda kedisiplinan log jari.',
+                  icon: ShieldAlert,
+                  colorClass: 'text-rose-600 bg-rose-50 dark:bg-rose-950/20'
+                },
+                {
+                  id: 'inventaris',
+                  title: 'Inventaris & Aset',
+                  desc: 'Kontrol peminjaman, kondisi pemeliharaan, dan inventori aset inventaris kantor.',
+                  icon: ShoppingBag,
+                  colorClass: 'text-teal-600 bg-teal-50 dark:bg-teal-950/20'
+                },
+                {
+                  id: 'draft-surat',
+                  title: 'Draft Surat & Dokumen',
+                  desc: 'Generator otomatis dokumen resmi (SK Pengangkatan, Mutasi, SP) siap cetak via template.',
+                  icon: FileText,
+                  colorClass: 'text-purple-600 bg-purple-50 dark:bg-purple-950/20'
+                },
+                {
+                  id: 'komunikasi',
+                  title: 'Komunikasi Massal',
+                  desc: 'Publikasi memo direksi, instruksi PT, dan pengumuman interaktif ke seluruh portal karyawan.',
+                  icon: Megaphone,
+                  colorClass: 'text-cyan-600 bg-cyan-50 dark:bg-cyan-950/20'
+                }
+              ].map((mod) => {
+                const IconComp = mod.icon;
+                const isEnabled = localModules[mod.id] !== false;
+                return (
+                  <div 
+                    key={mod.id} 
+                    className="flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-slate-50 transition-all gap-4"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={`p-2 rounded-lg ${mod.colorClass} shrink-0 mt-0.5`}>
+                        <IconComp className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <span className="text-xs font-bold text-slate-850 block">{mod.title}</span>
+                        <span className="text-[10px] text-slate-500 font-normal leading-normal block mt-0.5 max-w-md">{mod.desc}</span>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLocalModules(prev => ({
+                          ...prev,
+                          [mod.id]: !isEnabled
+                        }));
+                      }}
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        isEnabled ? 'bg-blue-600' : 'bg-slate-200'
+                      }`}
+                      id={`module-switch-${mod.id}`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                          isEnabled ? 'translate-x-4' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                );
+              })}
+
+              {/* Immutable Module placeholders */}
+              <div className="flex items-center justify-between p-3 rounded-xl border border-dashed border-slate-200 bg-slate-50/30 gap-4 opacity-70">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 rounded-lg text-slate-400 bg-slate-100 shrink-0 mt-0.5">
+                    <Sliders className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                      Aturan Kerja (Pengaturan)
+                      <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-slate-250 text-slate-600 font-extrabold uppercase">Sistem</span>
+                    </span>
+                    <span className="text-[10px] text-slate-550 font-normal leading-normal block mt-0.5">
+                      Konstruksi vital penentu denda lambat presensi &amp; diagnosa koneksi database aaPanel.
+                    </span>
+                  </div>
+                </div>
+                <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded-lg">Selalu Aktif</span>
+              </div>
+
+              <div className="flex items-center justify-between p-3 rounded-xl border border-dashed border-slate-200 bg-slate-50/30 gap-4 opacity-70">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 rounded-lg text-slate-400 bg-slate-100 shrink-0 mt-0.5">
+                    <Shield className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                      Manajemen Akses
+                      <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-slate-250 text-slate-600 font-extrabold uppercase">Keamanan</span>
+                    </span>
+                    <span className="text-[10px] text-slate-550 font-normal leading-normal block mt-0.5">
+                      Distribusi otorisasi hak akun login (Super Admin, HR Manager, Division Manager).
+                    </span>
+                  </div>
+                </div>
+                <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded-lg">Selalu Aktif</span>
               </div>
             </div>
           </div>
