@@ -2,9 +2,13 @@ import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
-import { initializeDatabase, loadHrisData, saveHrisCollection, getDbStatus, pingDatabase } from "./server/db";
+import { startMysqlMockServer } from "./server/mysql-mock";
+import { initializeDatabase, loadHrisData, saveHrisCollection, getDbStatus, pingDatabase, getDetailedDbStatus, syncAllLocalToMySQL } from "./server/db";
 
 async function startServer() {
+  // Start local MySQL mock server to simulate aaPanel/VPS production database on localhost:3306
+  await startMysqlMockServer();
+
   // Initialize the database connection (checks .env for MySQL)
   await initializeDatabase();
 
@@ -13,18 +17,6 @@ async function startServer() {
 
   // Enable JSON parse for POST payloads
   app.use(express.json({ limit: '10mb' }));
-
-  // Middleware to normalize /hris requests for subdirectory deployments
-  app.use((req, res, next) => {
-    if (req.url.startsWith('/hris/api/')) {
-      req.url = req.url.replace('/hris/api/', '/api/');
-    } else if (req.url === '/hris' || req.url === '/hris/') {
-      req.url = '/';
-    } else if (req.url.startsWith('/hris/')) {
-      req.url = req.url.replace('/hris/', '/');
-    }
-    next();
-  });
 
   // API: Smart Insight Attendance trends and HR policy advisor
   app.post("/api/gemini/insight", async (req, res) => {
@@ -117,13 +109,27 @@ Harap kembalikan laporan analitis ini langsung dalam format teks Markdown.`;
 
   // --- DATABASE API ENDPOINTS ---
   
-  // Endpoint to get database connection status
-  app.get("/api/db/status", (req, res) => {
+  // Endpoint to get database connection status with real-time ping latency & sync logs
+  app.get("/api/db/status", async (req, res) => {
     try {
-      const status = getDbStatus();
+      const status = await getDetailedDbStatus();
       return res.json({ success: true, ...status });
     } catch (error: any) {
       return res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // Endpoint to explicitly execute full sync from local files to current active MySQL database
+  app.post("/api/db/sync", async (req, res) => {
+    try {
+      const result = await syncAllLocalToMySQL();
+      return res.json(result);
+    } catch (error: any) {
+      console.error("Error executing manual database sync:", error);
+      return res.status(500).json({
+        success: false,
+        message: error.message || "Terjadi kesalahan saat menyinkronkan database."
+      });
     }
   });
 

@@ -110,6 +110,13 @@ export interface CompanyProfile {
   signatoryTitle?: string;
 }
 
+export interface ShiftConfig {
+  workingHourStart: string;
+  workingHourEnd: string;
+  toleranceMinutes: number;
+  lateMultiplierRate: number;
+}
+
 export interface SolutionDeviceConfig {
   ipAddress: string;
   port: number;
@@ -121,6 +128,7 @@ export interface SolutionDeviceConfig {
   lastSyncTime?: string;
   enabledModules?: Record<string, boolean>;
   companyProfile?: CompanyProfile;
+  shiftConfig?: ShiftConfig;
 }
 
 export interface RawFingerprintLog {

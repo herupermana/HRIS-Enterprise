@@ -33,6 +33,7 @@ interface PayrollProps {
   ) => void;
   onGeneratePayrollForPeriod: (periodId: string) => void;
   onAddManualAttendance?: (record: AttendanceRecord) => void;
+  deviceConfig?: any;
 }
 
 export default function Penggajian({
@@ -45,7 +46,8 @@ export default function Penggajian({
   onUpdatePayrollStatus,
   onUpdatePayrollApproval,
   onGeneratePayrollForPeriod,
-  onAddManualAttendance
+  onAddManualAttendance,
+  deviceConfig
 }: PayrollProps) {
   const [selectedPeriodId, setSelectedPeriodId] = useState(periods[0]?.id || '');
   const [activePayrollRecord, setActivePayrollRecord] = useState<(PayrollRecord & { overtimePay?: number; overtimeMinutes?: number; customAllowance?: number; customDeduction?: number; remarks?: string }) | null>(null);
@@ -125,6 +127,18 @@ export default function Penggajian({
     const saved = localStorage.getItem('hris_late_deduction_rate');
     return saved ? parseInt(saved, 10) : INITIAL_SHIFTS.lateMultiplierRate;
   });
+
+  // Keep state synced dynamically with server database configs from Settings tab
+  React.useEffect(() => {
+    if (deviceConfig?.shiftConfig) {
+      if (deviceConfig.shiftConfig.workingHourEnd) {
+        setStandardCheckOut(deviceConfig.shiftConfig.workingHourEnd);
+      }
+      if (deviceConfig.shiftConfig.lateMultiplierRate !== undefined) {
+        setLateDeductionRate(deviceConfig.shiftConfig.lateMultiplierRate);
+      }
+    }
+  }, [deviceConfig?.shiftConfig]);
 
   // Persisted manual adjustments (allowances, deductions, notes) for each period
   const [adjustments, setAdjustments] = useState<{

@@ -143,6 +143,32 @@ const AttendanceWeeklyTooltip = ({ active, payload, label }: any) => {
   return null;
 };
 
+const AttendanceWeeklyRateTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-slate-900/95 border border-slate-800 p-3 rounded-xl shadow-lg backdrop-blur-xs text-xs text-white space-y-1 animate-in fade-in zoom-in-95 duration-150">
+        <p className="font-extrabold text-slate-200">{label}</p>
+        {payload.map((item: any, i: number) => (
+          <div key={i} className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color || item.fill }} />
+              <span className="text-slate-400">{item.name}:</span>
+            </div>
+            <span className="font-mono font-bold text-white">
+              {item.value}%
+            </span>
+          </div>
+        ))}
+        <div className="border-t border-slate-800/60 pt-1.5 mt-1.5 flex justify-between text-[10px] text-slate-400">
+          <span>Kehadiran Nyata:</span>
+          <span className="font-mono font-bold text-emerald-400">{payload[0]?.payload.Hadir} Orang</span>
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
+
 const LatenessTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
@@ -384,6 +410,7 @@ export default function Dashboard({
   onUpdateLeaveStatus
 }: DashboardProps) {
   const [logSearch, setLogSearch] = React.useState('');
+  const [weeklyViewMode, setWeeklyViewMode] = React.useState<'count' | 'trend'>('trend');
   const [logModuleFilter, setLogModuleFilter] = React.useState<string>('all');
   const [logStartDate, setLogStartDate] = React.useState('');
   const [logEndDate, setLogEndDate] = React.useState('');
@@ -1806,6 +1833,11 @@ export default function Dashboard({
       }).length;
 
       const absenceCount = Math.max(0, totalEmpCount - presentCount - onLeaveCount);
+      
+      // Calculate ratios in percent
+      const presentRate = totalEmpCount > 0 ? Math.round((presentCount / totalEmpCount) * 100) : 0;
+      const leaveRate = totalEmpCount > 0 ? Math.round((onLeaveCount / totalEmpCount) * 100) : 0;
+      const absenceRate = totalEmpCount > 0 ? Math.round((absenceCount / totalEmpCount) * 100) : 0;
 
       result.push({
         date: dateString,
@@ -1813,6 +1845,9 @@ export default function Dashboard({
         Hadir: presentCount,
         'Cuti / Izin': onLeaveCount,
         Absen: absenceCount,
+        'Rasio Hadir (%)': presentRate,
+        'Rasio Cuti (%)': leaveRate,
+        'Rasio Absen (%)': absenceRate,
         total: totalEmpCount
       });
     }
@@ -2206,64 +2241,143 @@ export default function Dashboard({
             <div className="flex flex-col sm:flex-row justify-between sm:items-start gap-4 mb-6">
               <div>
                 <h3 className="text-sm font-semibold text-slate-800 tracking-tight flex items-center gap-2">
-                  <Calendar className="w-4.5 h-4.5 text-blue-600 animate-pulse" /> Statistik Absensi Mingguan
+                  <Calendar className="w-4.5 h-4.5 text-blue-600 animate-pulse" /> Statistik &amp; Tren Absensi Mingguan
                 </h3>
-                <p className="text-xs text-slate-400 mt-1">Rasio kehadiran, cuti, dan mangkir harian secara real-time</p>
+                <p className="text-xs text-slate-400 mt-1">Pola kehadiran, cuti, dan mangkir harian secara grafis</p>
               </div>
               <div className="flex items-center gap-2">
-                <span className="px-2.5 py-0.5 text-[9px] font-bold bg-blue-50 text-blue-700 rounded border border-blue-100 uppercase tracking-widest font-mono shrink-0">
-                  Presensi Staf
-                </span>
+                <div className="flex items-center gap-1.5 bg-slate-100 p-0.5 rounded-lg border border-slate-200 shrink-0 select-none">
+                  <button
+                    type="button"
+                    onClick={() => setWeeklyViewMode('count')}
+                    className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
+                      weeklyViewMode === 'count'
+                        ? 'bg-white text-slate-800 shadow-xs'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    Jumlah Staf
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setWeeklyViewMode('trend')}
+                    className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
+                      weeklyViewMode === 'trend'
+                        ? 'bg-white text-slate-800 shadow-xs'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    Tren Grafik (%)
+                  </button>
+                </div>
               </div>
             </div>
 
             <div className="h-72 text-xs" id="weekly-attendance-chart-container">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={weeklyAttendanceStatistics}
-                  margin={{ top: 5, right: 10, left: -20, bottom: 0 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-                  <XAxis 
-                    dataKey="label" 
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: '#64748B', fontSize: 9, fontWeight: 'bold' }} 
-                  />
-                  <YAxis 
-                    axisLine={false}
-                    tickLine={false}
-                    allowDecimals={false}
-                    tick={{ fill: '#64748B', fontSize: 10 }}
-                  />
-                  <Tooltip content={<AttendanceWeeklyTooltip />} />
-                  <Legend 
-                    verticalAlign="top" 
-                    height={32} 
-                    iconType="circle"
-                    iconSize={8}
-                    wrapperStyle={{ fontSize: 10, fontWeight: 'bold' }}
-                  />
-                  <Bar 
-                    name="Hadir" 
-                    dataKey="Hadir" 
-                    stackId="attendance-weekly-stack" 
-                    fill="#10B981" 
-                  />
-                  <Bar 
-                    name="Cuti / Izin" 
-                    dataKey="Cuti / Izin" 
-                    stackId="attendance-weekly-stack" 
-                    fill="#F59E0B" 
-                  />
-                  <Bar 
-                    name="Tanpa Keterangan / Mangkir" 
-                    dataKey="Absen" 
-                    stackId="attendance-weekly-stack" 
-                    fill="#EF4444" 
-                    radius={[4, 4, 0, 0]} 
-                  />
-                </BarChart>
+                {weeklyViewMode === 'trend' ? (
+                  <AreaChart
+                    data={weeklyAttendanceStatistics}
+                    margin={{ top: 5, right: 10, left: -20, bottom: 0 }}
+                  >
+                    <defs>
+                      <linearGradient id="colorWeeklyTrendHadir" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#10B981" stopOpacity={0.25}/>
+                        <stop offset="95%" stopColor="#10B981" stopOpacity={0.01}/>
+                      </linearGradient>
+                      <linearGradient id="colorWeeklyTrendAbsen" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#EF4444" stopOpacity={0.15}/>
+                        <stop offset="95%" stopColor="#EF4444" stopOpacity={0.01}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                    <XAxis 
+                      dataKey="label" 
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: '#64748B', fontSize: 9, fontWeight: 'bold' }} 
+                    />
+                    <YAxis 
+                      domain={[0, 100]}
+                      axisLine={false}
+                      tickLine={false}
+                      tickFormatter={(v) => `${v}%`}
+                      tick={{ fill: '#64748B', fontSize: 10 }}
+                    />
+                    <Tooltip content={<AttendanceWeeklyRateTooltip />} />
+                    <Legend 
+                      verticalAlign="top" 
+                      height={32} 
+                      iconType="circle"
+                      iconSize={8}
+                      wrapperStyle={{ fontSize: 10, fontWeight: 'bold' }}
+                    />
+                    <Area 
+                      name="Rasio Kehadiran (%)" 
+                      type="monotone" 
+                      dataKey="Rasio Hadir (%)" 
+                      stroke="#10B981" 
+                      strokeWidth={2.5}
+                      fillOpacity={1}
+                      fill="url(#colorWeeklyTrendHadir)"
+                    />
+                    <Area 
+                      name="Rasio Mangkir (%)" 
+                      type="monotone" 
+                      dataKey="Rasio Absen (%)" 
+                      stroke="#EF4444" 
+                      strokeWidth={1.5}
+                      fillOpacity={1}
+                      fill="url(#colorWeeklyTrendAbsen)"
+                    />
+                  </AreaChart>
+                ) : (
+                  <BarChart
+                    data={weeklyAttendanceStatistics}
+                    margin={{ top: 5, right: 10, left: -20, bottom: 0 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                    <XAxis 
+                      dataKey="label" 
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: '#64748B', fontSize: 9, fontWeight: 'bold' }} 
+                    />
+                    <YAxis 
+                      axisLine={false}
+                      tickLine={false}
+                      allowDecimals={false}
+                      tick={{ fill: '#64748B', fontSize: 10 }}
+                    />
+                    <Tooltip content={<AttendanceWeeklyTooltip />} />
+                    <Legend 
+                      verticalAlign="top" 
+                      height={32} 
+                      iconType="circle"
+                      iconSize={8}
+                      wrapperStyle={{ fontSize: 10, fontWeight: 'bold' }}
+                    />
+                    <Bar 
+                      name="Hadir" 
+                      dataKey="Hadir" 
+                      stackId="attendance-weekly-stack" 
+                      fill="#10B981" 
+                    />
+                    <Bar 
+                      name="Cuti / Izin" 
+                      dataKey="Cuti / Izin" 
+                      stackId="attendance-weekly-stack" 
+                      fill="#F59E0B" 
+                    />
+                    <Bar 
+                      name="Tanpa Keterangan / Mangkir" 
+                      dataKey="Absen" 
+                      stackId="attendance-weekly-stack" 
+                      fill="#EF4444" 
+                      radius={[4, 4, 0, 0]} 
+                    />
+                  </BarChart>
+                )}
               </ResponsiveContainer>
             </div>
           </>

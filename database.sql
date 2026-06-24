@@ -1,11 +1,11 @@
 -- =====================================================================================
 -- DATABASE SCHEMA FOR SYSTEM HRIS (KARYAWAN, ABSENSI, GAJI, DAN CUTI)
--- DOMAIN PROYEK: hrispwk.ideabuabu.web.id
+-- DOMAIN PROYEK: cumalogika.space
 -- DIKONFIGURASI UNTUK: MySQL 5.7+ / MariaDB 10.3+ (aaPanel VPS)
 -- =====================================================================================
 
-CREATE DATABASE IF NOT EXISTS hris_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE hris_db;
+CREATE DATABASE IF NOT EXISTS hpstate CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE hpstate;
 
 -- -------------------------------------------------------------------------------------
 -- OPSI A: TABEL PENPUL DATA UTAMA (Sistem Node.js Auto-Sync Terintegrasi)

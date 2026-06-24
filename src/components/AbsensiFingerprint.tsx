@@ -109,6 +109,8 @@ export default function Absensi({
 }: AbsensiProps) {
   const [activeMethod, setActiveMethod] = useState<'network' | 'file-upload'>('network');
   const [rawText, setRawText] = useState('');
+  const [isDragging, setIsDragging] = useState(false);
+  const [uploadedFileInfo, setUploadedFileInfo] = useState<{ name: string; size: number } | null>(null);
   const [rawMachineLogs, setRawMachineLogs] = useState<RawMachineLog[]>(INITIAL_RAW_MACHINE_LOGS);
   const [rawSearchQuery, setRawSearchQuery] = useState('');
   const [isSyncing, setIsSyncing] = useState(false);
@@ -336,6 +338,21 @@ export default function Absensi({
     let endHour = 17;
     let endMin = 0;
 
+    if (shiftPattern === 'Pagi' && deviceConfig?.shiftConfig?.workingHourStart) {
+      const [h, m] = deviceConfig.shiftConfig.workingHourStart.split(':').map(Number);
+      if (!isNaN(h) && !isNaN(m)) {
+        startHour = h;
+        startMin = m;
+      }
+    }
+    if (shiftPattern === 'Pagi' && deviceConfig?.shiftConfig?.workingHourEnd) {
+      const [h, m] = deviceConfig.shiftConfig.workingHourEnd.split(':').map(Number);
+      if (!isNaN(h) && !isNaN(m)) {
+        endHour = h;
+        endMin = m;
+      }
+    }
+
     if (shiftPattern === 'Siang') {
       startHour = 14;
       startMin = 0;
@@ -349,7 +366,9 @@ export default function Absensi({
     }
     
     const [inHour, inMin] = checkInTime.split(':').map(Number);
-    const tolerance = INITIAL_SHIFTS.toleranceMinutes; // 15 mins
+    const tolerance = deviceConfig?.shiftConfig?.toleranceMinutes !== undefined
+      ? deviceConfig.shiftConfig.toleranceMinutes
+      : INITIAL_SHIFTS.toleranceMinutes; // 15 mins
 
     // Minutes late
     const checkInMinutes = inHour * 60 + inMin;
@@ -474,6 +493,37 @@ export default function Absensi({
     });
 
     return logsList;
+  };
+
+  const readFile = (file: File) => {
+    if (!file.name.endsWith('.dat') && !file.name.endsWith('.txt')) {
+      alert('Tolong unggah berkas dengan format .dat atau .txt yang valid.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (event.target && typeof event.target.result === 'string') {
+        setRawText(event.target.result);
+        setUploadedFileInfo({ name: file.name, size: file.size });
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const handleFileDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const file = e.dataTransfer.files[0];
+      readFile(file);
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const file = e.target.files[0];
+      readFile(file);
+    }
   };
 
   const handleApplyDatUpload = () => {
@@ -1035,18 +1085,80 @@ export default function Absensi({
                     Unggah atau tempel transaksi logs biner yang diexport dari menu USB Flashdisk di mesin Solution X-100C.
                   </p>
                   <button
-                    onClick={() => setRawText(SAMPLE_X100C_DAT_FILE)}
-                    className="text-[10px] bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold px-2 py-1 rounded border"
+                    onClick={() => {
+                      setRawText(SAMPLE_X100C_DAT_FILE);
+                      setUploadedFileInfo({ name: "KM1_sample.dat", size: SAMPLE_X100C_DAT_FILE.length });
+                    }}
+                    className="text-[10px] bg-stone-150 hover:bg-stone-200 text-stone-700 font-bold px-2 py-1 rounded border transition-colors cursor-pointer"
                   >
                     Load Contoh Log Mentah (KM1.dat)
                   </button>
                 </div>
 
+                {/* Drag and Drop Zone */}
+                <div 
+                  onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                  onDragLeave={() => setIsDragging(false)}
+                  onDrop={handleFileDrop}
+                  onClick={() => document.getElementById('dat-file-input')?.click()}
+                  className={`border-2 border-dashed rounded-xl p-5 flex flex-col items-center justify-center transition-all cursor-pointer ${
+                    isDragging 
+                      ? 'border-blue-500 bg-blue-50/50' 
+                      : uploadedFileInfo 
+                        ? 'border-emerald-400 bg-emerald-50/20' 
+                        : 'border-slate-300 hover:border-blue-400 bg-slate-50/70'
+                  }`}
+                  id="dat-dropzone"
+                >
+                  <input 
+                    type="file" 
+                    id="dat-file-input" 
+                    className="hidden" 
+                    accept=".dat,.txt" 
+                    onChange={handleFileSelect} 
+                  />
+                  <div className="flex flex-col items-center text-center space-y-1.5 pointer-events-none">
+                    <div className={`p-2 rounded-full ${uploadedFileInfo ? 'bg-emerald-100' : 'bg-blue-100'}`}>
+                      <Upload className={`w-5 h-5 ${uploadedFileInfo ? 'text-emerald-600' : 'text-blue-600'}`} />
+                    </div>
+                    {uploadedFileInfo ? (
+                      <div>
+                        <p className="font-bold text-emerald-800 text-xs">Asal Berkas: {uploadedFileInfo.name}</p>
+                        <p className="text-[10px] text-emerald-600 mt-0.5">Ukuran: {(uploadedFileInfo.size / 1024).toFixed(2)} KB • Klik untuk mengganti berkas</p>
+                      </div>
+                    ) : (
+                      <div>
+                        <p className="font-bold text-slate-700 text-xs text-center">Tarik &amp; Lepas file berkas .dat hasil export flashdisk Anda di sini</p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">atau <span className="text-blue-600 font-extrabold hover:underline">Klik Cari File</span> dari komputer Anda (Mendukung .dat / .txt)</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10.5px] font-bold text-slate-650">Hasil Pembacaan Teks Log Dat:</span>
+                    {uploadedFileInfo && (
+                      <button 
+                        onClick={() => {
+                          setRawText('');
+                          setUploadedFileInfo(null);
+                        }}
+                        className="text-[10px] text-rose-600 hover:text-rose-700 font-extrabold cursor-pointer"
+                      >
+                        Hapus Berkas &amp; Reset Teks
+                      </button>
+                    )}
+                  </div>
                   <textarea
                     rows={4}
                     value={rawText}
-                    onChange={(e) => setRawText(e.target.value)}
+                    onChange={(e) => {
+                      setRawText(e.target.value);
+                      if (uploadedFileInfo && e.target.value === '') {
+                        setUploadedFileInfo(null);
+                      }
+                    }}
                     placeholder="Contoh format log:&#10;1001&#9;2026-06-11 07:48:12&#9;1&#9;0&#10;1002&#9;2026-06-11 07:55:40&#9;1&#9;0..."
                     className="w-full bg-slate-50 border border-slate-200 p-2 rounded-xl font-mono text-[10px] text-slate-700 placeholder-slate-450 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:bg-white"
                     id="textarea-raw-logs"

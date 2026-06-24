@@ -33,10 +33,41 @@ export default function Pengaturan({
   deviceConfig,
   onUpdateDeviceConfig
   }: SettingsProps) {
-  const [shiftState, setShiftState] = useState(INITIAL_SHIFTS);
+  const [shiftState, setShiftState] = useState(() => {
+    return deviceConfig?.shiftConfig || INITIAL_SHIFTS;
+  });
   const [isSaved, setIsSaved] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
   const [showDiagnostic, setShowDiagnostic] = useState(false);
+
+  // Salary, BPJS, PPh21, and Overtime rate configurations
+  const [bpjsKesehatan, setBpjsKesehatan] = useState<number>(() => {
+    const saved = localStorage.getItem('hris_bpjs_kesehatan_rate');
+    return saved ? parseFloat(saved) : 1;
+  });
+  const [bpjsKetenagakerjaan, setBpjsKetenagakerjaan] = useState<number>(() => {
+    const saved = localStorage.getItem('hris_bpjs_ketenagakerjaan_rate');
+    return saved ? parseFloat(saved) : 2;
+  });
+  const [pph21, setPph21] = useState<number>(() => {
+    const saved = localStorage.getItem('hris_pph21_rate');
+    return saved ? parseFloat(saved) : 5;
+  });
+  const [mealAllowance, setMealAllowance] = useState<number>(() => {
+    const saved = localStorage.getItem('hris_meal_transport_allowance');
+    return saved ? parseInt(saved, 10) : 50000;
+  });
+  const [overtimeRate, setOvertimeRate] = useState<number>(() => {
+    const saved = localStorage.getItem('hris_overtime_rate');
+    return saved ? parseInt(saved, 10) : 25000;
+  });
+
+  // Synchronize shiftConfig when deviceConfig changes
+  React.useEffect(() => {
+    if (deviceConfig?.shiftConfig) {
+      setShiftState(deviceConfig.shiftConfig);
+    }
+  }, [deviceConfig?.shiftConfig]);
 
   // Local state for active modules
   const [localModules, setLocalModules] = useState<Record<string, boolean>>(() => {
@@ -70,6 +101,62 @@ export default function Pengaturan({
     details?: string;
     solution?: string;
   } | null>(null);
+
+  // States for manual app-to-MySQL data migration/synchronization
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<{
+    success: boolean;
+    totalSynced?: number;
+    message?: string;
+  } | null>(null);
+
+  const handleExecuteSync = async () => {
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      const res = await fetch(getApiUrl("/api/db/sync"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" }
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSyncResult({
+          success: true,
+          totalSynced: data.totalSynced,
+          message: `Sukses memindahkan ${data.totalSynced} tabel data utama dari penyimpanan luring ke server MySQL.`
+        });
+        
+        // Also trigger administrative trace log
+        try {
+          window.dispatchEvent(new CustomEvent('hris_add_audit_log', {
+            detail: {
+              module: 'Sistem',
+              action: 'Sinkronisasi Manual',
+              details: `Sukses memigrasikan ${data.totalSynced} koleksi data lokal ke MySQL.`,
+              status: 'Sukses'
+            }
+          }));
+        } catch (e) {}
+
+        // Reload page to refresh everything from the synced database (ensuring instant reflection)
+        setTimeout(() => {
+          window.location.reload();
+        }, 1000);
+      } else {
+        setSyncResult({
+          success: false,
+          message: data.message || "Gagal menyinkronkan data lokal ke MySQL."
+        });
+      }
+    } catch (err: any) {
+      setSyncResult({
+        success: false,
+        message: err.message || "Gagal menghubungi API sync. Pastikan server aktif."
+      });
+    } finally {
+      setSyncing(false);
+    }
+  };
   
   const [useCustomDiagParams, setUseCustomDiagParams] = useState(false);
   const [diagConfig, setDiagConfig] = useState({
@@ -137,6 +224,28 @@ export default function Pengaturan({
   const handleSaveSettings = (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaved(true);
+    
+    // Save to local storage for backward compatibility with components directly reading it
+    localStorage.setItem('hris_working_hour_start', shiftState.workingHourStart);
+    localStorage.setItem('hris_working_hour_end', shiftState.workingHourEnd);
+    localStorage.setItem('hris_standard_checkout', shiftState.workingHourEnd);
+    localStorage.setItem('hris_tolerance_minutes', String(shiftState.toleranceMinutes));
+    localStorage.setItem('hris_late_deduction_rate', String(shiftState.lateMultiplierRate));
+
+    // Persist salary parameters
+    localStorage.setItem('hris_bpjs_kesehatan_rate', String(bpjsKesehatan));
+    localStorage.setItem('hris_bpjs_ketenagakerjaan_rate', String(bpjsKetenagakerjaan));
+    localStorage.setItem('hris_pph21_rate', String(pph21));
+    localStorage.setItem('hris_meal_transport_allowance', String(mealAllowance));
+    localStorage.setItem('hris_overtime_rate', String(overtimeRate));
+
+    // Dispatch event to notify Penggajian component
+    try {
+      window.dispatchEvent(new CustomEvent('hris_salary_config_updated'));
+    } catch (e) {
+      console.warn('Failed to dispatch salary config event', e);
+    }
+
     if (onUpdateShiftConfig) {
       onUpdateShiftConfig(shiftState);
     }
@@ -144,14 +253,15 @@ export default function Pengaturan({
       onUpdateDeviceConfig({
         ...deviceConfig,
         enabledModules: localModules,
-        companyProfile: companyProfile
+        companyProfile: companyProfile,
+        shiftConfig: shiftState
       });
       // Also trigger a custom log for administrative trace
       window.dispatchEvent(new CustomEvent('hris_add_audit_log', {
         detail: {
           module: 'Konfigurasi',
-          action: 'Ubah Profil Perusahaan',
-          details: `Melakukan pembaruan data profil organisasi ${companyProfile.name} secara aman di server database.`,
+          action: 'Ubah Aturan Kerja & Profil',
+          details: `Melakukan pembaruan profil ${companyProfile.name} beserta parameter jam kerja masuk (${shiftState.workingHourStart}) & toleransi (${shiftState.toleranceMinutes} menit) secara terpadu di server database.`,
           status: 'Sukses'
         }
       }));
@@ -498,27 +608,74 @@ export default function Pengaturan({
         <div className="space-y-6" id="settings-sidebar-col">
           <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4" id="bpjs-rates-card">
             <h4 className="text-sm font-semibold text-slate-850 tracking-tight flex items-center gap-1.5 pb-2 border-b border-slate-100">
-              <Landmark className="w-4.5 h-4.5 text-blue-600" /> Tarif BPJS &amp; Pajak PPh21
+              <Landmark className="w-4.5 h-4.5 text-blue-600" /> Tarif BPJS, Pajak &amp; Remunerasi
             </h4>
 
             <div className="space-y-3.5 text-xs">
-              <div className="flex justify-between items-center p-2.5 bg-slate-50 border border-slate-100 rounded-lg">
-                <span className="text-slate-500 font-medium">BPJS Kesehatan Karyawan:</span>
-                <span className="font-bold text-slate-900">1% (Potong Gaji)</span>
+              <div>
+                <label className="block text-slate-500 font-medium mb-1">BPJS Kesehatan Karyawan (%) *</label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={bpjsKesehatan}
+                    onChange={(e) => setBpjsKesehatan(parseFloat(e.target.value) || 0)}
+                    className="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-lg text-slate-800 font-bold focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:bg-white pr-8"
+                  />
+                  <span className="absolute right-3 top-2.5 text-slate-400 font-bold">%</span>
+                </div>
               </div>
 
-              <div className="flex justify-between items-center p-2.5 bg-slate-50 border border-slate-100 rounded-lg">
-                <span className="text-slate-500 font-medium">BPJS Ketenagakerjaan:</span>
-                <span className="font-bold text-slate-900">2% (Potong Gaji)</span>
+              <div>
+                <label className="block text-slate-500 font-medium mb-1">BPJS Ketenagakerjaan (%) *</label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={bpjsKetenagakerjaan}
+                    onChange={(e) => setBpjsKetenagakerjaan(parseFloat(e.target.value) || 0)}
+                    className="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-lg text-slate-800 font-bold focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:bg-white pr-8"
+                  />
+                  <span className="absolute right-3 top-2.5 text-slate-400 font-bold">%</span>
+                </div>
               </div>
 
-              <div className="flex justify-between items-center p-2.5 bg-slate-50 border border-slate-100 rounded-lg">
-                <span className="text-slate-500 font-medium">Estimasi Bruto PPh21:</span>
-                <span className="font-bold text-slate-900">Flat 5%</span>
+              <div>
+                <label className="block text-slate-500 font-medium mb-1">Estimasi Bruto PPh21 (%) *</label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={pph21}
+                    onChange={(e) => setPph21(parseFloat(e.target.value) || 0)}
+                    className="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-lg text-slate-800 font-bold focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:bg-white pr-8"
+                  />
+                  <span className="absolute right-3 top-2.5 text-slate-400 font-bold">%</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-500 font-medium mb-1">Tunjangan Makan &amp; Transport / Hari (Rp) *</label>
+                <input
+                  type="number"
+                  value={mealAllowance}
+                  onChange={(e) => setMealAllowance(parseInt(e.target.value, 10) || 0)}
+                  className="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-lg text-slate-800 font-bold focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-500 font-medium mb-1">Tarif Lembur per Jam (Rp) *</label>
+                <input
+                  type="number"
+                  value={overtimeRate}
+                  onChange={(e) => setOvertimeRate(parseInt(e.target.value, 10) || 0)}
+                  className="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-lg text-slate-800 font-bold focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:bg-white"
+                />
               </div>
 
               <p className="text-[10px] text-gray-400 mt-2 leading-relaxed">
-                Persentase iuran BPJS mengacu pada regulasi ketenagakerjaan Republik Indonesia terbaru. Pajak penghasilan dipotong otomatis pada saat slip payroll diterbitkan.
+                Parameter iuran BPJS, PPh21, tunjangan harian, dan lemburan di atas akan otomatis digunakan di dalam kalkulasi slip gaji pada modul <strong>Slip Penggajian</strong>.
               </p>
             </div>
           </div>
@@ -657,6 +814,50 @@ export default function Pengaturan({
               <p className="text-[11px] text-slate-400">Sedang memuat status database asinkron...</p>
             )}
 
+            {/* Sync Database Button */}
+            <div className="pt-3 border-t border-slate-100 space-y-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-bold text-slate-800">Sinkronisasi Manual (Migrasi Data)</p>
+                  <p className="text-[10px] text-slate-400">Pindahkan semua data luring (JSON Backup) ke database MySQL server.</p>
+                </div>
+                <button
+                  type="button"
+                  disabled={syncing}
+                  onClick={handleExecuteSync}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                    syncing 
+                      ? "bg-slate-100 text-slate-400 cursor-wait" 
+                      : dbStatus?.connected 
+                        ? "bg-blue-600 hover:bg-blue-700 text-white shadow-xs" 
+                        : "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed"
+                  }`}
+                  title={dbStatus?.connected ? "Mulai sinkronisasi data" : "Database MySQL belum terkoneksi"}
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
+                  {syncing ? "Menyinkronkan..." : "Sinkronkan Sekarang"}
+                </button>
+              </div>
+
+              {syncResult && (
+                <div className={`p-2.5 rounded-lg text-[11px] leading-relaxed border ${
+                  syncResult.success 
+                    ? "bg-green-50 border-green-200 text-green-700 font-medium" 
+                    : "bg-rose-50 border-rose-200 text-rose-700"
+                }`}>
+                  <p className="flex items-center gap-2">
+                    <span className="font-bold">{syncResult.success ? "✓ Berhasil!" : "✗ Gagal:"}</span>
+                    <span>{syncResult.message}</span>
+                  </p>
+                  {syncResult.success && (
+                    <p className="text-[9.5px] text-green-600 mt-1 italic animate-pulse">
+                      Halaman akan disegarkan otomatis dalam beberapa detik untuk memproses muatan database baru...
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+
             {/* Live Interactive Database Connection Diagnostics */}
             <div className="pt-3 border-t border-slate-100" id="live-db-diagnostics-test-panel">
               <button
@@ -732,7 +933,7 @@ export default function Pengaturan({
                             type="text"
                             value={diagConfig.database}
                             onChange={(e) => setDiagConfig({ ...diagConfig, database: e.target.value })}
-                            placeholder="hris_db"
+                            placeholder="hpstate"
                             className="w-full text-[11px] px-2 py-1 border border-slate-300 rounded focus:ring-1 focus:ring-blue-500 outline-none font-mono"
                           />
                         </div>
@@ -840,14 +1041,14 @@ export default function Pengaturan({
                       <ul className="list-disc pl-4 space-y-0.5 text-slate-500 text-[10.5px]">
                         <li>Masuk ke dasbor <strong>aaPanel</strong> Anda.</li>
                         <li>Klik menu <strong>Database</strong> di sidebar kiri, lalu klik tombol <strong>Add Database</strong>.</li>
-                        <li>Set <strong>Database name</strong>: <code className="bg-slate-200 px-1 rounded font-mono text-[10px]">hris_db</code> (bebas).</li>
+                        <li>Set <strong>Database name</strong>: <code className="bg-slate-200 px-1 rounded font-mono text-[10px]">hpstate</code> (bebas).</li>
                         <li>Pilih <strong>Charset</strong>: <code className="bg-slate-200 px-1 rounded font-mono text-[10px]">utf8mb4</code>.</li>
                         <li>Username dan Password akan terbuat otomatis, salin kredensial tersebut.</li>
                       </ul>
 
                       <p className="font-bold text-slate-700 mt-2.5">2. Konfigurasi File <code className="font-mono bg-slate-200 px-1 rounded">.env</code> di VPS Anda</p>
                       <ul className="list-disc pl-4 space-y-0.5 text-slate-500 text-[10.5px]">
-                        <li>Buka menu <strong>Files</strong> di aaPanel, navigasikan ke folder repositori Node project Anda: <code className="bg-slate-200 px-1 rounded font-mono text-[10px] text-slate-700 font-bold">/www/wwwroot/ideabuabu.web.id/hris/</code>.</li>
+                        <li>Buka menu <strong>Files</strong> di aaPanel, navigasikan ke folder repositori Node project Anda: <code className="bg-slate-200 px-1 rounded font-mono text-[10px] text-slate-700 font-bold">/www/wwwroot/cumalogika.space/</code>.</li>
                         <li>Buat file baru bernama <span className="font-extrabold text-slate-800">.env</span> (atau edit file yang ada).</li>
                         <li>Salin dan tempel konfigurasi berikut, sesuaikan dengan database yang telah Anda buat:</li>
                       </ul>
@@ -864,11 +1065,11 @@ DB_NAME=nama_database_anda
 GEMINI_API_KEY=kunci_gemini_api_anda`}
                       </pre>
 
-                      <p className="font-bold text-slate-700 mt-2.5">3. Tambahkan Domain <code className="font-mono bg-slate-200 px-1 rounded text-slate-850 font-bold">hrispwk.ideabuabu.web.id</code></p>
+                      <p className="font-bold text-slate-700 mt-2.5">3. Tambahkan Domain <code className="font-mono bg-slate-200 px-1 rounded text-slate-850 font-bold">cumalogika.space</code></p>
                       <ul className="list-disc pl-4 space-y-0.5 text-slate-500 text-[10.5px]">
                         <li>Di aaPanel, ke menu <strong>Website</strong> &gt; klik <strong>Node Project</strong> tab.</li>
                         <li>Klik tombol <strong>Add Node Project</strong> jika belum ada, masukkan port <code className="bg-slate-200 px-1 rounded font-mono text-[10px]">3000</code>.</li>
-                        <li>Di kolom <strong>Domain</strong>, masukkan <code className="bg-slate-200 px-1 rounded font-mono text-[10px]">hrispwk.ideabuabu.web.id</code>.</li>
+                        <li>Di kolom <strong>Domain</strong>, masukkan <code className="bg-slate-200 px-1 rounded font-mono text-[10px]">cumalogika.space</code>.</li>
                         <li>aaPanel akan otomatis membuat reservasi proxy domain ke port 3000.</li>
                       </ul>
 

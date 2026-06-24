@@ -79,8 +79,18 @@ function saveEnvConfig(config: {
   }
 }
 
+let lastDbAttempt = 0;
+const DB_ATTEMPT_COOLDOWN = 60000; // 1 minute cooldown to prevent connection attempts blocking user requests during offline sequences
+
 // Initialize DB (attempt MySQL pool, fallback to files)
-export async function initializeDatabase() {
+export async function initializeDatabase(force = false) {
+  const now = Date.now();
+  if (!force && !useMySQL && lastDbAttempt > 0 && (now - lastDbAttempt < DB_ATTEMPT_COOLDOWN)) {
+    return;
+  }
+  
+  lastDbAttempt = now;
+
   // Dynamically re-read .env config
   try {
     dotenv.config({ path: path.join(process.cwd(), ".env"), override: true });
@@ -253,6 +263,119 @@ export function getDbStatus() {
   };
 }
 
+// Read-time health check including latency ping and hpstate data synchronization status
+export async function getDetailedDbStatus() {
+  let latencyMs = -1;
+  let lastSync = null;
+  let collectionsCount = 0;
+  let useMySQLCurrent = useMySQL;
+
+  if (useMySQLCurrent && dbPool) {
+    try {
+      const start = process.hrtime();
+      await dbPool.query("SELECT 1");
+      const diff = process.hrtime(start);
+      latencyMs = Math.round((diff[0] * 1000) + (diff[1] / 1000000));
+      
+      const [rows]: any = await dbPool.query(
+        "SELECT COUNT(*) as count, MAX(updated_at) as last_sync FROM hris_collections"
+      );
+      if (rows && rows[0]) {
+        collectionsCount = rows[0].count;
+        lastSync = rows[0].last_sync ? new Date(rows[0].last_sync).toISOString() : null;
+      }
+    } catch (err: any) {
+      console.warn("Real-time ping check database failed:", err.message);
+      // Fallback immediately since query timed out or failed to prevent further freezes
+      useMySQL = false;
+      useMySQLCurrent = false;
+    }
+  }
+
+  return {
+    engine: useMySQLCurrent ? "MySQL (aaPanel Production)" : "SQLite/JSON File-system (Local Backup)",
+    isConnected: useMySQLCurrent,
+    host: useMySQLCurrent ? process.env.DB_HOST : "Local/Remote",
+    databaseName: useMySQLCurrent ? (process.env.DB_NAME || "hpstate") : "Local disk",
+    dataDirectory: DATA_DIR,
+    latencyMs,
+    lastSync,
+    collectionsCount
+  };
+}
+
+// Explicitly sync all local files from the local directory into the MySQL database tables
+export async function syncAllLocalToMySQL() {
+  if (!useMySQL) {
+    await initializeDatabase(true); // Force connect bypass
+  }
+
+  if (!useMySQL || !dbPool) {
+    throw new Error("Koneksi MySQL tidak aktif atau dibatasi. Silakan hubungkan database terlebih dahulu di tab Pengaturan.");
+  }
+
+  const syncedKeys: string[] = [];
+  const errors: string[] = [];
+
+  for (const key of COLLECTION_KEYS) {
+    const filePath = path.join(DATA_DIR, `${key}.json`);
+    if (fs.existsSync(filePath)) {
+      try {
+        const raw = fs.readFileSync(filePath, "utf-8");
+        // Verify valid JSON before sending to database
+        const parsed = JSON.parse(raw);
+        const dataStr = JSON.stringify(parsed);
+
+        await dbPool.query(
+          "INSERT INTO hris_collections (id, data_json) VALUES (?, ?) ON DUPLICATE KEY UPDATE data_json = ?",
+          [key, dataStr, dataStr]
+        );
+        syncedKeys.push(key);
+      } catch (err: any) {
+        console.error(`Gagal menyinkronkan koleksi ${key}:`, err.message);
+        errors.push(`${key}: ${err.message}`);
+      }
+    }
+  }
+
+  // Also write an audit log for the sync
+  try {
+    const timestamp = new Date().toISOString();
+    const [auditRows]: any = await dbPool.query("SELECT data_json FROM hris_collections WHERE id = 'auditLogs'");
+    let auditLogs = [];
+    if (auditRows && auditRows.length > 0) {
+      auditLogs = JSON.parse(auditRows[0].data_json);
+    }
+    const newLog = {
+      id: "log_" + Date.now(),
+      timestamp,
+      module: "Sistem",
+      action: "Sinkronisasi Database",
+      details: `Menjalankan pemindahan manual ${syncedKeys.length} tabel data dari memori lokal (Local Backup) ke database utama MySQL.`,
+      status: "Sukses",
+      operator: "Super Admin"
+    };
+    auditLogs.unshift(newLog);
+    // Limit to 500 records
+    if (auditLogs.length > 500) {
+      auditLogs = auditLogs.slice(0, 500);
+    }
+    await dbPool.query(
+      "INSERT INTO hris_collections (id, data_json) VALUES (?, ?) ON DUPLICATE KEY UPDATE data_json = ?",
+      ["auditLogs", JSON.stringify(auditLogs), JSON.stringify(auditLogs)]
+    );
+  } catch (auditErr: any) {
+    console.warn("Audit logging for sync task failed:", auditErr.message);
+  }
+
+  return {
+    success: true,
+    totalSynced: syncedKeys.length,
+    syncedKeys,
+    errors
+  };
+}
+
 // Diagnostic connection test to provide deep troubleshooting feedback
 export async function pingDatabase(customConfig?: {
   host?: string;
@@ -335,7 +458,7 @@ export async function pingDatabase(customConfig?: {
     } else if (errCode === "ENOTFOUND") {
       message = "Host Tidak Ditemukan (DNS Error/ENOTFOUND)";
       details = `Alamat host '${host}' tidak dapat diselesaikan atau tidak terdaftar dalam jaringan server.`;
-      solution = "Jika MySQL berada di VPS yang sama, gunakan IP Publik VPS Anda (misalnya IP hrispwk.ideabuabu.web.id) agar server eksternal ini bisa menjangkaunya.";
+      solution = "Jika MySQL berada di VPS yang sama, gunakan IP Publik VPS Anda (misalnya IP cumalogika.space) agar server eksternal ini bisa menjangkaunya.";
     } else if (errCode === "ETIMEDOUT") {
       message = "Waktu Koneksi Habis (ETIMEDOUT)";
       details = `Mencoba menghubungi ${host} tetapi tidak ada respons dalam batas waktu yang ditentukan.`;

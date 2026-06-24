@@ -196,6 +196,12 @@ export const INITIAL_DEVICE_CONFIG: SolutionDeviceConfig = {
     registrationNumber: 'AHU-0019283-AH.01.01.2024',
     signatoryName: 'Hendra Wijaya, M.T.',
     signatoryTitle: 'Direktur Utama'
+  },
+  shiftConfig: {
+    workingHourStart: '08:00',
+    workingHourEnd: '17:00',
+    toleranceMinutes: 15,
+    lateMultiplierRate: 5000
   }
 };
 
