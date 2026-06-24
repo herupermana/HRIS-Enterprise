@@ -170,6 +170,9 @@ export default function App() {
     databaseName?: string;
   }>({ loading: true, error: null, saving: false, savingDetails: null });
 
+  // Ref to track last stringified data version to skip redundant saves on initial mount/fetches
+  const lastSavedData = React.useRef<Record<string, string>>({});
+
   // Load all initial data from DB backend on startup
   useEffect(() => {
     async function loadData() {
@@ -179,20 +182,62 @@ export default function App() {
         
         if (json.success && json.data) {
           const dbData = json.data;
-          if (dbData.employees) setEmployees(dbData.employees);
-          if (dbData.attendance) setAttendance(dbData.attendance);
-          if (dbData.leaves) setLeaves(dbData.leaves);
-          if (dbData.payrollRecords) setPayrollRecords(dbData.payrollRecords);
-          if (dbData.deviceConfig) setDeviceConfig(dbData.deviceConfig);
-          if (dbData.periods) setPeriods(dbData.periods);
-          if (dbData.auditLogs) setAuditLogs(dbData.auditLogs);
-          if (dbData.salaryHistory) setSalaryHistory(dbData.salaryHistory);
-          if (dbData.mutationHistory) setMutationHistory(dbData.mutationHistory);
-          if (dbData.holidays) setHolidays(dbData.holidays);
-          if (dbData.announcements) setAnnouncements(dbData.announcements);
-          if (dbData.assets) setAssets(dbData.assets);
-          if (dbData.users) setUsers(dbData.users);
-          if (dbData.violations) setViolations(dbData.violations);
+          if (dbData.employees) {
+            setEmployees(dbData.employees);
+            lastSavedData.current.employees = JSON.stringify(dbData.employees);
+          }
+          if (dbData.attendance) {
+            setAttendance(dbData.attendance);
+            lastSavedData.current.attendance = JSON.stringify(dbData.attendance);
+          }
+          if (dbData.leaves) {
+            setLeaves(dbData.leaves);
+            lastSavedData.current.leaves = JSON.stringify(dbData.leaves);
+          }
+          if (dbData.payrollRecords) {
+            setPayrollRecords(dbData.payrollRecords);
+            lastSavedData.current.payrollRecords = JSON.stringify(dbData.payrollRecords);
+          }
+          if (dbData.deviceConfig) {
+            setDeviceConfig(dbData.deviceConfig);
+            lastSavedData.current.deviceConfig = JSON.stringify(dbData.deviceConfig);
+          }
+          if (dbData.periods) {
+            setPeriods(dbData.periods);
+            lastSavedData.current.periods = JSON.stringify(dbData.periods);
+          }
+          if (dbData.auditLogs) {
+            setAuditLogs(dbData.auditLogs);
+            lastSavedData.current.auditLogs = JSON.stringify(dbData.auditLogs);
+          }
+          if (dbData.salaryHistory) {
+            setSalaryHistory(dbData.salaryHistory);
+            lastSavedData.current.salaryHistory = JSON.stringify(dbData.salaryHistory);
+          }
+          if (dbData.mutationHistory) {
+            setMutationHistory(dbData.mutationHistory);
+            lastSavedData.current.mutationHistory = JSON.stringify(dbData.mutationHistory);
+          }
+          if (dbData.holidays) {
+            setHolidays(dbData.holidays);
+            lastSavedData.current.holidays = JSON.stringify(dbData.holidays);
+          }
+          if (dbData.announcements) {
+            setAnnouncements(dbData.announcements);
+            lastSavedData.current.announcements = JSON.stringify(dbData.announcements);
+          }
+          if (dbData.assets) {
+            setAssets(dbData.assets);
+            lastSavedData.current.assets = JSON.stringify(dbData.assets);
+          }
+          if (dbData.users) {
+            setUsers(dbData.users);
+            lastSavedData.current.users = JSON.stringify(dbData.users);
+          }
+          if (dbData.violations) {
+            setViolations(dbData.violations);
+            lastSavedData.current.violations = JSON.stringify(dbData.violations);
+          }
         }
 
         const statusRes = await fetch(getApiUrl("/api/db/status"));
@@ -257,6 +302,13 @@ export default function App() {
   // Shared function to update backend collection
   const saveCollectionToServer = async (key: string, data: any) => {
     try {
+      const stringified = JSON.stringify(data);
+      if (lastSavedData.current[key] === stringified) {
+        // Data has not changed from the database/latest save, skip network request
+        return;
+      }
+      lastSavedData.current[key] = stringified;
+
       setDbStatus(prev => ({ ...prev, saving: true, savingDetails: `Menyimpan ${key}...` }));
       const response = await fetch(getApiUrl("/api/db/save"), {
         method: "POST",
