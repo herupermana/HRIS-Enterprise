@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Activity, Database, FileText, Upload, RefreshCw, 
-  HelpCircle, Settings, CheckCircle2, AlertCircle, Plus, 
+  HelpCircle, Settings, CheckCircle2, AlertCircle, AlertTriangle, Plus, 
   Trash, Eye, ArrowDownToLine, Clock, Cpu,
   Wifi, WifiOff, HardDrive, Signal, Edit, Save,
   CalendarDays, Search, Printer
@@ -189,6 +189,38 @@ export default function Absensi({
       };
     }
     return null;
+  };
+
+  // Calculate accumulated late minutes per employee per month
+  const monthlyLatenessByEmployee = useMemo(() => {
+    const map: Record<string, Record<string, number>> = {};
+    attendance.forEach(rec => {
+      if (!rec.employeeId || !rec.date) return;
+      const month = rec.date.substring(0, 7); // YYYY-MM
+      if (!map[rec.employeeId]) {
+        map[rec.employeeId] = {};
+      }
+      map[rec.employeeId][month] = (map[rec.employeeId][month] || 0) + (rec.lateMinutes || 0);
+    });
+    return map;
+  }, [attendance]);
+
+  // Load KPI Targets from local storage
+  const kpiTargets = useMemo(() => {
+    try {
+      const saved = localStorage.getItem('hris_kpi_targets_map');
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch (e) {
+      console.error('Error parsing hris_kpi_targets_map:', e);
+    }
+    return {};
+  }, []);
+
+  const getTargetLatenessMinutes = (employeeId: string) => {
+    const targets = kpiTargets[employeeId];
+    return targets?.targetLatenessMinutes !== undefined ? targets.targetLatenessMinutes : 45;
   };
 
   const filteredAttendance = useMemo(() => {
@@ -1565,8 +1597,24 @@ export default function Absensi({
                   const holidayInfo = holidays.find(h => h.date === rec.date);
                   const mismatch = getShiftMismatchDetails(rec.checkIn, rec.checkOut, emp?.shiftPattern || 'Pagi');
                   
+                  // Calculate monthly lateness and quota
+                  const recordMonth = rec.date.substring(0, 7);
+                  const accumulatedLateness = monthlyLatenessByEmployee[rec.employeeId]?.[recordMonth] || 0;
+                  const targetLateness = getTargetLatenessMinutes(rec.employeeId);
+                  const isExceededLatenessQuota = accumulatedLateness > targetLateness;
+                  
                   return (
-                    <tr key={rec.id} className={`hover:bg-gray-50 transition-colors ${mismatch ? 'bg-rose-50/20' : ''}`} id={`tbl-row-${rec.id}`}>
+                    <tr 
+                      key={rec.id} 
+                      className={`hover:bg-gray-50 transition-colors ${
+                        isExceededLatenessQuota 
+                          ? 'bg-rose-50 hover:bg-rose-100/85 border-l-4 border-l-red-500' 
+                          : mismatch 
+                            ? 'bg-rose-50/20' 
+                            : ''
+                      }`} 
+                      id={`tbl-row-${rec.id}`}
+                    >
                       <td className="p-3">
                         <div className="font-semibold text-gray-900 flex flex-wrap items-center gap-1.5">
                           <span>{emp?.name || 'Karyawan PIN ' + rec.pin}</span>
@@ -1579,6 +1627,12 @@ export default function Absensi({
                           </span>
                         </div>
                         <div className="text-[10px] text-gray-400 font-mono">PIN: {rec.pin} · ID: {rec.employeeId}</div>
+                        {isExceededLatenessQuota && (
+                          <div className="mt-1 flex items-center gap-1 text-[9px] font-extrabold text-red-700 bg-red-100/70 border border-red-200 rounded px-1.5 py-0.5 max-w-fit" title={`Akumulasi terlambat bulan ini (${accumulatedLateness} mnt) telah melampaui kuota (${targetLateness} mnt)`}>
+                            <AlertTriangle className="w-3 h-3 shrink-0 text-red-600 animate-pulse" />
+                            <span>BATAS TERLAMBAT TERLAMPAUI ({accumulatedLateness}/{targetLateness} mnt)</span>
+                          </div>
+                        )}
                         {mismatch && (
                           <div className="mt-1 flex items-center gap-1 text-[9px] font-extrabold text-rose-600 bg-rose-50 border border-rose-100 rounded px-1.5 py-0.5 max-w-fit" title={mismatch.reason}>
                             <AlertCircle className="w-3 h-3 shrink-0" />
