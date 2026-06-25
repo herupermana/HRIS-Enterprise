@@ -117,6 +117,19 @@ export interface ShiftConfig {
   lateMultiplierRate: number;
 }
 
+export interface SystemConfig {
+  serverTimeout?: number;
+  dbPoolLimit?: number;
+  autosaveFreq?: string;
+  logRetention?: number;
+  accentTheme?: string;
+  sidebarBrand?: string;
+  systemLang?: string;
+  audioAlerts?: string;
+  showDbSidebar?: string;
+  autoRejectLeave?: string;
+}
+
 export interface SolutionDeviceConfig {
   ipAddress: string;
   port: number;
@@ -129,6 +142,7 @@ export interface SolutionDeviceConfig {
   enabledModules?: Record<string, boolean>;
   companyProfile?: CompanyProfile;
   shiftConfig?: ShiftConfig;
+  systemConfig?: SystemConfig;
 }
 
 export interface RawFingerprintLog {

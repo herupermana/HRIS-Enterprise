@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Calendar, Inbox, Plus, Check, X, FileText, 
-  HelpCircle, AlertCircle, Clock, CheckCircle2, ShieldCheck
+  HelpCircle, AlertCircle, Clock, CheckCircle2, ShieldCheck,
+  ChevronLeft, ChevronRight, Users
 } from 'lucide-react';
 import { Employee, LeaveRequest, Holiday } from '../types';
 
@@ -23,7 +24,15 @@ export default function CutiIzin({
   holidays,
   onUpdateHolidays
 }: LeaveProps) {
-  const [activeSubTab, setActiveSubTab] = useState<'leaves' | 'holidays'>('leaves');
+  const [activeSubTab, setActiveSubTab] = useState<'leaves' | 'holidays' | 'calendar'>('leaves');
+  
+  // Team Calendar view states
+  const [calYear, setCalYear] = useState<number>(() => new Date().getFullYear());
+  const [calMonth, setCalMonth] = useState<number>(() => new Date().getMonth());
+  const [selectedCalEmployeeId, setSelectedCalEmployeeId] = useState<string>('All');
+  const [selectedCalLeaveType, setSelectedCalLeaveType] = useState<string>('All');
+  const [selectedCalDay, setSelectedCalDay] = useState<number | null>(() => new Date().getDate());
+
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isHolidayFormOpen, setIsHolidayFormOpen] = useState(false);
   const [selectedTypeFilter, setSelectedTypeFilter] = useState<'All' | 'Pending' | 'Disetujui' | 'Ditolak'>('All');
@@ -36,6 +45,48 @@ export default function CutiIzin({
     type: 'Nasional' as Holiday['type'],
     description: ''
   });
+
+  const formatDateStr = (y: number, m: number, d: number) => {
+    const mm = String(m + 1).padStart(2, '0');
+    const dd = String(d).padStart(2, '0');
+    return `${y}-${mm}-${dd}`;
+  };
+
+  const getLeavesOnDate = (dateStr: string) => {
+    return leaves.filter(l => {
+      if (selectedCalEmployeeId !== 'All' && l.employeeId !== selectedCalEmployeeId) {
+        return false;
+      }
+      if (selectedCalLeaveType !== 'All' && l.type !== selectedCalLeaveType) {
+        return false;
+      }
+      return l.status === 'Disetujui' && dateStr >= l.startDate && dateStr <= l.endDate;
+    });
+  };
+
+  const getHolidayOnDate = (dateStr: string) => {
+    return holidays.find(h => h.date === dateStr);
+  };
+
+  const calendarDays = React.useMemo(() => {
+    const firstDayIndex = new Date(calYear, calMonth, 1).getDay();
+    const startOffset = firstDayIndex === 0 ? 6 : firstDayIndex - 1;
+    const totalDays = new Date(calYear, calMonth + 1, 0).getDate();
+    const daysArr: { day: number | null; dateStr: string | null }[] = [];
+    
+    for (let i = 0; i < startOffset; i++) {
+      daysArr.push({ day: null, dateStr: null });
+    }
+    
+    for (let d = 1; d <= totalDays; d++) {
+      daysArr.push({
+        day: d,
+        dateStr: formatDateStr(calYear, calMonth, d)
+      });
+    }
+    
+    return daysArr;
+  }, [calYear, calMonth]);
 
   const getMinDateH7 = () => {
     const d = new Date();
@@ -173,6 +224,20 @@ export default function CutiIzin({
     const matchedEmp = employees.find(emp => emp.id === formData.employeeId);
     if (!matchedEmp) return;
 
+    const isAutoRejectActive = localStorage.getItem('hris_auto_reject_leave') !== 'off';
+    let wasRejected = false;
+    let remainingQuota = 12;
+    if (isAutoRejectActive && formData.type === 'Cuti Tahunan') {
+      const empSelectedLeaves = leaves.filter(l => l.employeeId === formData.employeeId);
+      const approvedAnnualLeavesCount = empSelectedLeaves
+        .filter(l => l.type === 'Cuti Tahunan' && l.status === 'Disetujui')
+        .reduce((sum, l) => sum + l.duration, 0);
+      remainingQuota = Math.max(0, 12 - approvedAnnualLeavesCount);
+      if (duration > remainingQuota) {
+        wasRejected = true;
+      }
+    }
+
     onAddLeaveRequest({
       id: `LV-${Math.floor(100 + Math.random() * 900)}`,
       employeeId: formData.employeeId,
@@ -185,6 +250,12 @@ export default function CutiIzin({
       status: 'Pending',
       submissionDate: new Date().toISOString().split('T')[0]
     });
+
+    if (wasRejected) {
+      alert(`⚠️ SISTEM AUTO-REJECT:\n\nPengajuan Cuti Tahunan untuk ${matchedEmp.name} langsung DITOLAK otomatis karena melebihi sisa kuota jatah tahunan.\n\n• Sisa Kuota Cuti Karyawan: ${remainingQuota} hari\n• Durasi yang Diajukan: ${duration} hari kerja`);
+    } else {
+      alert(`Sukses menambahkan pengajuan ${formData.type} untuk ${matchedEmp.name}.`);
+    }
 
     setIsFormOpen(false);
     setFormData({
@@ -225,10 +296,21 @@ export default function CutiIzin({
         >
           <Calendar className="w-3.5 h-3.5" /> Kalender Hari Libur Nasional
         </button>
+        <button
+          onClick={() => setActiveSubTab('calendar')}
+          className={`px-4 py-2 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+            activeSubTab === 'calendar' 
+              ? 'bg-blue-600 text-white shadow' 
+              : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
+          }`}
+          id="btn-subtab-calendar"
+        >
+          <Calendar className="w-3.5 h-3.5" /> Visualisasi Kalender Tim
+        </button>
       </div>
 
       <AnimatePresence mode="wait">
-        {activeSubTab === 'leaves' ? (
+        {activeSubTab === 'leaves' && (
           <motion.div 
             key="subtab-view-leaves"
             initial={{ opacity: 0, y: 10 }}
@@ -617,7 +699,8 @@ export default function CutiIzin({
               </div>
             </div>
           </motion.div>
-        ) : (
+        )}
+        {activeSubTab === 'holidays' && (
           <motion.div 
             key="subtab-view-holidays"
             initial={{ opacity: 0, y: 10 }}
@@ -730,6 +813,514 @@ export default function CutiIzin({
                   </li>
                 </ul>
               </div>
+            </div>
+          </motion.div>
+        )}
+        
+        {activeSubTab === 'calendar' && (
+          <motion.div
+            key="subtab-view-calendar"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.15 }}
+            className="grid grid-cols-1 lg:grid-cols-3 gap-6"
+            id="calendar-layout-container"
+          >
+            {/* Left Column: Calendar Grid & Stats */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Calendar Card */}
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-4" id="visual-team-calendar-card">
+                {/* Calendar Header with Controls */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+                  <div className="space-y-0.5">
+                    <h3 className="font-extrabold text-slate-850 dark:text-slate-150 text-sm flex items-center gap-2">
+                      <Calendar className="w-4.5 h-4.5 text-blue-600" /> Visualisasi Kalender Tim &amp; Shift
+                    </h3>
+                    <p className="text-[10px] text-gray-400">Pemantauan jatah cuti yang disetujui, libur nasional, dan ketersediaan staf harian.</p>
+                  </div>
+                  
+                  {/* Month/Year selector navigation */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (calMonth === 0) {
+                          setCalMonth(11);
+                          setCalYear(prev => prev - 1);
+                        } else {
+                          setCalMonth(prev => prev - 1);
+                        }
+                      }}
+                      className="p-1.5 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg text-slate-600 dark:text-slate-400 transition-colors cursor-pointer"
+                      title="Bulan Sebelumnya"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    
+                    {/* Month Dropdown */}
+                    <select
+                      value={calMonth}
+                      onChange={(e) => setCalMonth(parseInt(e.target.value))}
+                      className="bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-750 px-2 py-1 rounded-lg text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none cursor-pointer"
+                    >
+                      {['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'].map((m, idx) => (
+                        <option key={idx} value={idx}>{m}</option>
+                      ))}
+                    </select>
+                    
+                    {/* Year Dropdown */}
+                    <select
+                      value={calYear}
+                      onChange={(e) => setCalYear(parseInt(e.target.value))}
+                      className="bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-750 px-2 py-1 rounded-lg text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none cursor-pointer"
+                    >
+                      {[2024, 2025, 2026, 2027, 2028].map(y => (
+                        <option key={y} value={y}>{y}</option>
+                      ))}
+                    </select>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (calMonth === 11) {
+                          setCalMonth(0);
+                          setCalYear(prev => prev + 1);
+                        } else {
+                          setCalMonth(prev => prev + 1);
+                        }
+                      }}
+                      className="p-1.5 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg text-slate-600 dark:text-slate-400 transition-colors cursor-pointer"
+                      title="Bulan Berikutnya"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Filter bar and Legend */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50/70 dark:bg-slate-850 p-3 rounded-xl border border-slate-100 dark:border-slate-800 text-xs">
+                  {/* Dropdown Filters */}
+                  <div className="flex flex-wrap gap-2.5 items-center">
+                    <div className="space-y-1">
+                      <label className="block text-[9px] text-slate-400 font-bold uppercase tracking-wider">Saring Karyawan</label>
+                      <select
+                        value={selectedCalEmployeeId}
+                        onChange={(e) => setSelectedCalEmployeeId(e.target.value)}
+                        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-1.5 rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-300 focus:outline-none focus:border-blue-500 cursor-pointer"
+                      >
+                        <option value="All">Semua Karyawan</option>
+                        {employees.map(emp => (
+                          <option key={emp.id} value={emp.id}>{emp.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="block text-[9px] text-slate-400 font-bold uppercase tracking-wider">Jenis Pengajuan</label>
+                      <select
+                        value={selectedCalLeaveType}
+                        onChange={(e) => setSelectedCalLeaveType(e.target.value)}
+                        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-1.5 rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-300 focus:outline-none focus:border-blue-500 cursor-pointer"
+                      >
+                        <option value="All">Semua Jenis</option>
+                        {leaveTypes.map(type => (
+                          <option key={type} value={type}>{type}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Legend */}
+                  <div className="flex flex-wrap gap-2 items-center justify-start md:justify-end">
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-rose-600 bg-rose-50 dark:bg-rose-950/30 px-1.5 py-0.5 rounded border border-rose-100 dark:border-rose-900/50">
+                      <span className="w-1.5 h-1.5 bg-rose-500 rounded-full"></span> Libur Nasional
+                    </span>
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-blue-600 bg-blue-50 dark:bg-blue-950/30 px-1.5 py-0.5 rounded border border-blue-100 dark:border-blue-900/50">
+                      <span className="w-1.5 h-1.5 bg-blue-500 rounded-full"></span> Cuti Tahunan
+                    </span>
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30 px-1.5 py-0.5 rounded border border-emerald-100 dark:border-emerald-900/50">
+                      <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span> Sakit
+                    </span>
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-purple-600 bg-purple-50 dark:bg-purple-950/30 px-1.5 py-0.5 rounded border border-purple-100 dark:border-purple-900/50">
+                      <span className="w-1.5 h-1.5 bg-purple-500 rounded-full"></span> Izin / Melahirkan
+                    </span>
+                  </div>
+                </div>
+
+                {/* Calendar Grid Container */}
+                <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-2xs">
+                  {/* Days of Week Header */}
+                  <div className="grid grid-cols-7 bg-slate-100 dark:bg-slate-800 text-center py-2.5 font-bold font-sans text-xs text-slate-700 dark:text-slate-300 border-b border-slate-200 dark:border-slate-800">
+                    <div>Sen</div>
+                    <div>Sel</div>
+                    <div>Rab</div>
+                    <div>Kam</div>
+                    <div>Jum</div>
+                    <div className="text-slate-400 dark:text-slate-500">Sab</div>
+                    <div className="text-slate-400 dark:text-slate-500">Min</div>
+                  </div>
+
+                  {/* Calendar Grid Days */}
+                  <div className="grid grid-cols-7 bg-slate-50/50 dark:bg-slate-900 divide-x divide-y divide-slate-200 dark:divide-slate-800 border-l border-t border-slate-200 dark:border-slate-800">
+                    {calendarDays.map((cell, idx) => {
+                      const isPadding = cell.day === null;
+                      const dateStr = cell.dateStr;
+                      
+                      if (isPadding || !dateStr) {
+                        return (
+                          <div 
+                            key={`pad-${idx}`} 
+                            className="min-h-[95px] bg-slate-50/30 dark:bg-slate-950/10"
+                          />
+                        );
+                      }
+
+                      const dayNum = cell.day;
+                      const dayOfWeek = new Date(calYear, calMonth, dayNum).getDay();
+                      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+                      
+                      const holidayOnDay = getHolidayOnDate(dateStr);
+                      const leavesOnDay = getLeavesOnDate(dateStr);
+                      const isSelected = selectedCalDay === dayNum;
+                      
+                      const isToday = new Date().toISOString().split('T')[0] === dateStr;
+
+                      return (
+                        <div
+                          key={`day-${dayNum}`}
+                          onClick={() => setSelectedCalDay(dayNum)}
+                          className={`min-h-[95px] p-2 flex flex-col justify-between transition-all cursor-pointer relative select-none ${
+                            isSelected 
+                              ? 'bg-blue-50/40 dark:bg-blue-950/20 ring-2 ring-blue-500/50 z-10' 
+                              : holidayOnDay 
+                                ? 'bg-rose-50/20 dark:bg-rose-950/10 hover:bg-slate-100 dark:hover:bg-slate-800'
+                                : isWeekend
+                                  ? 'bg-slate-100/40 dark:bg-slate-800/20 hover:bg-slate-100 dark:hover:bg-slate-800'
+                                  : 'bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/50'
+                          }`}
+                        >
+                          {/* Day Header */}
+                          <div className="flex justify-between items-start">
+                            <span className={`text-xs font-bold font-mono px-1.5 py-0.5 rounded-md ${
+                              isToday 
+                                ? 'bg-blue-600 text-white shadow-2xs' 
+                                : isWeekend
+                                  ? 'text-slate-400 dark:text-slate-500'
+                                  : 'text-slate-700 dark:text-slate-300'
+                            }`}>
+                              {dayNum}
+                            </span>
+                            
+                            {/* Dot indicator */}
+                            <div className="flex gap-1">
+                              {holidayOnDay && (
+                                <span 
+                                  className="w-1.5 h-1.5 rounded-full bg-rose-500" 
+                                  title={`Hari Libur: ${holidayOnDay.name}`}
+                                />
+                              )}
+                              {leavesOnDay.length > 0 && (
+                                <span 
+                                  className={`w-1.5 h-1.5 rounded-full ${
+                                    leavesOnDay.some(l => l.type === 'Cuti Tahunan') ? 'bg-blue-500' : 'bg-emerald-500'
+                                  }`}
+                                  title={`${leavesOnDay.length} karyawan cuti`}
+                                />
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Day Body */}
+                          <div className="mt-2 space-y-1 overflow-hidden flex-1 flex flex-col justify-end">
+                            {holidayOnDay && (
+                              <div className="text-[8px] font-extrabold text-rose-600 dark:text-rose-400 bg-rose-100/60 dark:bg-rose-950/30 px-1 py-0.5 rounded truncate border border-rose-200/50 dark:border-rose-900/30" title={holidayOnDay.name}>
+                                🎉 {holidayOnDay.name}
+                              </div>
+                            )}
+                            
+                            {/* Leaves list */}
+                            {leavesOnDay.slice(0, 2).map(l => {
+                              let badgeColor = "bg-blue-50 text-blue-700 dark:bg-blue-950/20 dark:text-blue-300 border-blue-200/50 dark:border-blue-800/40";
+                              if (l.type.startsWith('Sakit')) {
+                                badgeColor = "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-300 border-emerald-200/50 dark:border-emerald-800/40";
+                              } else if (l.type.startsWith('Izin')) {
+                                badgeColor = "bg-purple-50 text-purple-700 dark:bg-purple-950/20 dark:text-purple-300 border-purple-200/50 dark:border-purple-800/40";
+                              } else if (l.type === 'Melahirkan') {
+                                badgeColor = "bg-pink-50 text-pink-700 dark:bg-pink-950/20 dark:text-pink-300 border-pink-200/50 dark:border-pink-800/40";
+                              }
+                              
+                              return (
+                                <div 
+                                  key={l.id} 
+                                  className={`text-[8px] font-bold px-1 py-0.5 rounded border flex items-center gap-0.5 truncate ${badgeColor}`}
+                                >
+                                  <span className="shrink-0">👤</span>
+                                  <span className="truncate">{l.employeeName.split(' ')[0]}</span>
+                                </div>
+                              );
+                            })}
+                            {leavesOnDay.length > 2 && (
+                              <div className="text-[7.5px] font-extrabold text-slate-500 text-center">
+                                +{leavesOnDay.length - 2} Orang
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Monthly Summary Statistics */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Distribusi Cuti */}
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-3">
+                  <h4 className="text-xs font-extrabold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                    <Users className="w-4 h-4 text-emerald-600" /> Distribusi Cuti Bulan Ini
+                  </h4>
+                  {(() => {
+                    const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+                    let totalCutiDaysCount = 0;
+                    const employeeAbsenceMap: Record<string, { name: string; count: number }> = {};
+                    
+                    for (let d = 1; d <= daysInMonth; d++) {
+                      const ds = formatDateStr(calYear, calMonth, d);
+                      const activeOnDay = leaves.filter(l => l.status === 'Disetujui' && ds >= l.startDate && ds <= l.endDate);
+                      totalCutiDaysCount += activeOnDay.length;
+                      
+                      activeOnDay.forEach(l => {
+                        if (!employeeAbsenceMap[l.employeeId]) {
+                          employeeAbsenceMap[l.employeeId] = { name: l.employeeName, count: 0 };
+                        }
+                        employeeAbsenceMap[l.employeeId].count += 1;
+                      });
+                    }
+                    
+                    const sortedAbsences = Object.values(employeeAbsenceMap).sort((a, b) => b.count - a.count);
+
+                    return (
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-850 rounded-xl border border-slate-100 dark:border-slate-800">
+                          <span className="text-xs font-semibold text-slate-500">Akumulasi Cuti Disetujui</span>
+                          <span className="text-xs font-extrabold text-blue-700 dark:text-blue-400 font-mono bg-blue-50 dark:bg-blue-950/20 px-2.5 py-1 rounded border border-blue-100 dark:border-blue-900/50">
+                            {totalCutiDaysCount} Hari Kerja
+                          </span>
+                        </div>
+                        
+                        {sortedAbsences.length > 0 ? (
+                          <div className="space-y-1.5">
+                            <span className="text-[10px] text-slate-400 font-bold uppercase block">Paling Banyak Mengambil Cuti:</span>
+                            <div className="space-y-1.5 max-h-[110px] overflow-y-auto pr-1">
+                              {sortedAbsences.slice(0, 3).map((item, i) => (
+                                <div key={i} className="flex justify-between items-center text-xs font-bold text-slate-700 dark:text-slate-300">
+                                  <span className="flex items-center gap-1.5">
+                                    <span className="text-slate-300 font-mono">#{i+1}</span> {item.name}
+                                  </span>
+                                  <span className="font-mono bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-[10px] text-slate-600 dark:text-slate-400">
+                                    {item.count} hari
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-[10px] text-slate-400 italic text-center py-2">Belum ada jatah cuti disetujui bulan ini.</p>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* Info Card */}
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm flex flex-col justify-between">
+                  <div className="space-y-2">
+                    <h4 className="text-xs font-extrabold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                      <ShieldCheck className="w-4 h-4 text-blue-600" /> Perencanaan Jadwal &amp; Shift
+                    </h4>
+                    <p className="text-[10px] text-slate-500 leading-relaxed font-semibold">
+                      Gunakan representasi visual ini untuk memonitor kepadatan ketersediaan staf sebelum menyetujui lembur, membagi shift, atau merencanakan rapat koordinasi berkala.
+                    </p>
+                  </div>
+                  <div className="mt-3 p-2.5 bg-blue-50 dark:bg-blue-950/25 text-blue-800 dark:text-blue-300 border border-blue-100 dark:border-blue-900/50 rounded-xl text-[9px] font-bold">
+                    💡 Klik tanggal apa saja untuk meninjau status ketersediaan personel dan informasi libur nasional secara terperinci.
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column: Day Detail Inspector (Sidebar pane) */}
+            <div className="space-y-6">
+              {(() => {
+                const selectedDateStr = selectedCalDay ? formatDateStr(calYear, calMonth, selectedCalDay) : null;
+                const holidayOnSelected = selectedDateStr ? getHolidayOnDate(selectedDateStr) : null;
+                const leavesOnSelected = selectedDateStr ? getLeavesOnDate(selectedDateStr) : [];
+                
+                const formatIndoDate = (y: number, m: number, d: number) => {
+                  const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+                  const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+                  const dt = new Date(y, m, d);
+                  return `${days[dt.getDay() || 0]}, ${d} ${months[m]} ${y}`;
+                };
+
+                const formattedDateLabel = selectedCalDay ? formatIndoDate(calYear, calMonth, selectedCalDay) : "Pilih Tanggal";
+
+                const totalEmployeesCount = employees.length;
+                const leaveCountOnSelectedDate = leavesOnSelected.length;
+                const activeStaffCount = Math.max(0, totalEmployeesCount - leaveCountOnSelectedDate);
+                const capacityPercent = totalEmployeesCount > 0 ? Math.round((activeStaffCount / totalEmployeesCount) * 100) : 100;
+
+                return (
+                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-5" id="day-inspector-card">
+                    {/* Title Date */}
+                    <div className="pb-3 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <h4 className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Detail Tanggal Terpilih</h4>
+                        <h3 className="font-extrabold text-slate-850 dark:text-slate-150 text-sm tracking-tight">{formattedDateLabel}</h3>
+                      </div>
+                      {selectedDateStr && (
+                        <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-mono font-extrabold px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700">
+                          {selectedDateStr}
+                        </span>
+                      )}
+                    </div>
+
+                    {selectedCalDay ? (
+                      <>
+                        {/* 1. National Holiday on Selected Day */}
+                        {holidayOnSelected && (
+                          <div className="bg-rose-50 dark:bg-rose-950/20 border border-rose-150 dark:border-rose-900/50 rounded-xl p-3.5 space-y-1">
+                            <span className="inline-flex items-center gap-1 text-[9px] font-bold text-rose-700 bg-rose-100 dark:bg-rose-900/40 px-2 py-0.5 rounded-full border border-rose-200">
+                              🎉 Hari Libur: {holidayOnSelected.type === 'Nasional' ? 'Nasional' : 'Cuti Bersama'}
+                            </span>
+                            <p className="text-xs font-extrabold text-rose-900 dark:text-rose-300">{holidayOnSelected.name}</p>
+                            {holidayOnSelected.description && (
+                              <p className="text-[10px] text-rose-700/80 leading-relaxed font-semibold">{holidayOnSelected.description}</p>
+                            )}
+                          </div>
+                        )}
+
+                        {/* 2. Team Capacity Meter */}
+                        <div className="bg-slate-50 dark:bg-slate-800/30 border border-slate-100 dark:border-slate-800 rounded-xl p-3.5 space-y-3">
+                          <div className="flex justify-between items-center">
+                            <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Ketersediaan Personel</span>
+                            <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full border ${
+                              capacityPercent >= 80 
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300' 
+                                : capacityPercent >= 50 
+                                  ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300' 
+                                  : 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/30 dark:text-rose-300'
+                            }`}>
+                              {capacityPercent}% Aktif
+                            </span>
+                          </div>
+
+                          {/* Progress bar */}
+                          <div className="space-y-1.5">
+                            <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 overflow-hidden">
+                              <div 
+                                className={`h-full rounded-full transition-all duration-300 ${
+                                  capacityPercent >= 80 
+                                    ? 'bg-emerald-500' 
+                                    : capacityPercent >= 50 
+                                      ? 'bg-amber-500' 
+                                      : 'bg-rose-500'
+                                }`}
+                                style={{ width: `${capacityPercent}%` }}
+                              />
+                            </div>
+                            <div className="flex justify-between text-[10px] font-bold text-slate-650">
+                              <span>Kapasitas Operasional:</span>
+                              <span className="text-slate-900 dark:text-slate-100">{activeStaffCount} / {totalEmployeesCount} Personel</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 3. Employees on Leave on this Day */}
+                        <div className="space-y-3">
+                          <h5 className="text-[9px] text-slate-500 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                            👤 Kru Mengajukan Cuti ({leaveCountOnSelectedDate} Orang)
+                          </h5>
+                          
+                          {leaveCountOnSelectedDate > 0 ? (
+                            <div className="space-y-3 max-h-[240px] overflow-y-auto pr-1">
+                              {leavesOnSelected.map(l => {
+                                const empDetail = employees.find(e => e.id === l.employeeId);
+                                
+                                let leaveTypeColor = "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30 border-blue-100 dark:border-blue-900/50";
+                                if (l.type.startsWith('Sakit')) {
+                                  leaveTypeColor = "text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 border-emerald-100 dark:border-emerald-900/50";
+                                } else if (l.type.startsWith('Izin')) {
+                                  leaveTypeColor = "text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/30 border-purple-100 dark:border-purple-900/50";
+                                } else if (l.type === 'Melahirkan') {
+                                  leaveTypeColor = "text-pink-600 dark:text-pink-400 bg-pink-50 dark:bg-pink-950/30 border-pink-100 dark:border-pink-900/50";
+                                }
+
+                                return (
+                                  <div key={l.id} className="border border-slate-150 dark:border-slate-800 rounded-xl p-3 space-y-2 bg-slate-50/20 dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-all">
+                                    <div className="flex justify-between items-start">
+                                      <div className="space-y-0.5">
+                                        <p className="text-xs font-extrabold text-slate-800 dark:text-slate-200">{l.employeeName}</p>
+                                        <p className="text-[9px] font-mono text-slate-400">NIP: {l.employeeId} • Departemen: {empDetail?.department || 'Operasional'}</p>
+                                      </div>
+                                      <span className={`text-[9px] font-bold px-2 py-0.5 rounded border ${leaveTypeColor}`}>
+                                        {l.type}
+                                      </span>
+                                    </div>
+                                    
+                                    <div className="text-[10px] text-slate-650 leading-relaxed bg-white dark:bg-slate-850 p-2 rounded border border-slate-100 dark:border-slate-800/50">
+                                      <strong className="text-slate-850 dark:text-slate-200 block mb-0.5">Alasan Keperluan:</strong>
+                                      <span className="font-semibold italic">"{l.reason || 'Tidak ada keterangan detail.'}"</span>
+                                    </div>
+
+                                    <div className="flex justify-between items-center text-[9px] text-slate-450 font-semibold pt-1 border-t border-slate-100 dark:border-slate-800/30">
+                                      <span>Rentang: {l.startDate} s/d {l.endDate}</span>
+                                      <span className="font-bold text-slate-700 dark:text-slate-300">Durasi: {l.duration} Hari</span>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <div className="bg-slate-50 dark:bg-slate-800/20 border border-dashed rounded-xl p-6 text-center text-slate-400 flex flex-col items-center gap-1">
+                              <span className="text-base">🌴</span>
+                              <p className="text-[10px] font-bold">Kondisi Aman! Seluruh kru hadir &amp; aktif pada tanggal ini.</p>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* 4. Crew Availability List (Available Staff) */}
+                        <div className="space-y-2 border-t border-slate-100 dark:border-slate-800/50 pt-3">
+                          <h5 className="text-[9px] text-slate-500 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                            <Check className="w-3.5 h-3.5 text-emerald-500" /> Staf Aktif Siap Bekerja ({activeStaffCount} Orang)
+                          </h5>
+                          <div className="flex flex-wrap gap-1.5 max-h-[140px] overflow-y-auto pr-1">
+                            {employees.map(emp => {
+                              const isEmpOnLeave = leavesOnSelected.some(l => l.employeeId === emp.id);
+                              if (isEmpOnLeave) return null;
+                              
+                              return (
+                                <span 
+                                  key={emp.id}
+                                  className="text-[9px] font-bold px-2 py-1 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-300 border border-emerald-100 dark:border-emerald-900/50 rounded-lg flex items-center gap-1"
+                                >
+                                  <span className="w-1 h-1 bg-emerald-500 rounded-full" /> {emp.name}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-center py-10 text-slate-400 space-y-2">
+                        <Calendar className="w-8 h-8 mx-auto text-slate-300 animate-pulse" />
+                        <p className="text-[10px] font-bold leading-relaxed">Pilih salah satu tanggal di kalender untuk menginspeksi ketersediaan divisi secara mendalam.</p>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           </motion.div>
         )}

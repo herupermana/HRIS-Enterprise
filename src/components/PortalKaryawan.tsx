@@ -269,6 +269,23 @@ export default function PortalKaryawan({
     }
     const duration = workingDaysCount > 0 ? workingDaysCount : 1;
 
+    const isAutoRejectActive = localStorage.getItem('hris_auto_reject_leave') !== 'off';
+    let wasRejected = false;
+    let sisaKuotaInfo = 12;
+
+    if (isAutoRejectActive && leaveForm.type === 'Cuti Tahunan') {
+      const empSelectedLeaves = leaves.filter(l => l.employeeId === currentUser.id);
+      const approvedAnnualLeavesCount = empSelectedLeaves
+        .filter(l => l.type === 'Cuti Tahunan' && l.status === 'Disetujui')
+        .reduce((sum, l) => sum + l.duration, 0);
+      const remainingQuota = Math.max(0, 12 - approvedAnnualLeavesCount);
+      sisaKuotaInfo = remainingQuota;
+
+      if (duration > remainingQuota) {
+        wasRejected = true;
+      }
+    }
+
     onAddLeaveRequest({
       id: `LV-EMP-${Math.floor(100 + Math.random() * 900)}`,
       employeeId: currentUser.id,
@@ -283,7 +300,11 @@ export default function PortalKaryawan({
     });
 
     // Notify user
-    alert(`Sukses mengajukan ${leaveForm.type} selama ${duration} hari. Harap tunggu persetujuan dari tim HR.`);
+    if (wasRejected) {
+      alert(`⚠️ PEMBERITAHUAN AUTO-REJECT:\n\nPengajuan Cuti Tahunan Anda otomatis DITOLAK oleh sistem karena melebihi batas sisa kuota tahunan berjalan.\n\n• Sisa Kuota Cuti Anda: ${sisaKuotaInfo} hari\n• Durasi yang Diajukan: ${duration} hari kerja`);
+    } else {
+      alert(`Sukses mengajukan ${leaveForm.type} selama ${duration} hari. Harap tunggu persetujuan dari tim HR.`);
+    }
     
     // Clear form
     setLeaveForm({

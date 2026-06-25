@@ -47,6 +47,103 @@ export default function App() {
     return (localStorage.getItem('hris_display_density') || 'lapang') as 'ringkas' | 'lapang';
   });
 
+  const [accentTheme, setAccentTheme] = useState<string>(() => {
+    return localStorage.getItem('hris_accent_theme') || 'blue';
+  });
+
+  const [sidebarBrand, setSidebarBrand] = useState<string>(() => {
+    return localStorage.getItem('hris_sidebar_brand') || 'HRIS Enterprise';
+  });
+
+  const [systemLang, setSystemLang] = useState<string>(() => {
+    return localStorage.getItem('hris_system_lang') || 'id';
+  });
+
+  const [showDbSidebar, setShowDbSidebar] = useState<string>(() => {
+    return localStorage.getItem('hris_show_db_sidebar') || 'on';
+  });
+
+  const [autoRejectLeave, setAutoRejectLeave] = useState<string>(() => {
+    return localStorage.getItem('hris_auto_reject_leave') || 'on';
+  });
+
+  const getAccentColor = (type: 'text-nav' | 'bg-nav' | 'border-nav' | 'text-icon' | 'bg-dot' | 'bg-button' | 'bg-button-hover' | 'bg-badge' | 'text-badge' | 'border-badge') => {
+    switch (accentTheme) {
+      case 'emerald':
+        if (type === 'text-nav') return 'text-emerald-400';
+        if (type === 'bg-nav') return 'bg-emerald-600/10';
+        if (type === 'border-nav') return 'border border-emerald-600/20';
+        if (type === 'text-icon') return 'text-emerald-400';
+        if (type === 'bg-dot') return 'bg-emerald-500';
+        if (type === 'bg-button') return 'bg-emerald-600';
+        if (type === 'bg-button-hover') return 'hover:bg-emerald-700';
+        if (type === 'bg-badge') return 'bg-emerald-50/10';
+        if (type === 'text-badge') return 'text-emerald-400';
+        if (type === 'border-badge') return 'border-emerald-500/20';
+        return '';
+      case 'indigo':
+        if (type === 'text-nav') return 'text-indigo-400';
+        if (type === 'bg-nav') return 'bg-indigo-600/10';
+        if (type === 'border-nav') return 'border border-indigo-600/20';
+        if (type === 'text-icon') return 'text-indigo-400';
+        if (type === 'bg-dot') return 'bg-indigo-500';
+        if (type === 'bg-button') return 'bg-indigo-600';
+        if (type === 'bg-button-hover') return 'hover:bg-indigo-700';
+        if (type === 'bg-badge') return 'bg-indigo-50/10';
+        if (type === 'text-badge') return 'text-indigo-400';
+        if (type === 'border-badge') return 'border-indigo-500/20';
+        return '';
+      case 'violet':
+        if (type === 'text-nav') return 'text-violet-400';
+        if (type === 'bg-nav') return 'bg-violet-600/10';
+        if (type === 'border-nav') return 'border border-violet-600/20';
+        if (type === 'text-icon') return 'text-violet-400';
+        if (type === 'bg-dot') return 'bg-violet-500';
+        if (type === 'bg-button') return 'bg-violet-600';
+        if (type === 'bg-button-hover') return 'hover:bg-violet-700';
+        if (type === 'bg-badge') return 'bg-violet-50/10';
+        if (type === 'text-badge') return 'text-violet-400';
+        if (type === 'border-badge') return 'border-violet-500/20';
+        return '';
+      case 'amber':
+        if (type === 'text-nav') return 'text-amber-400';
+        if (type === 'bg-nav') return 'bg-amber-500/10';
+        if (type === 'border-nav') return 'border border-amber-500/20';
+        if (type === 'text-icon') return 'text-amber-400';
+        if (type === 'bg-dot') return 'bg-amber-500';
+        if (type === 'bg-button') return 'bg-amber-500';
+        if (type === 'bg-button-hover') return 'hover:bg-amber-600';
+        if (type === 'bg-badge') return 'bg-amber-50/10';
+        if (type === 'text-badge') return 'text-amber-400';
+        if (type === 'border-badge') return 'border-amber-500/20';
+        return '';
+      case 'rose':
+        if (type === 'text-nav') return 'text-rose-400';
+        if (type === 'bg-nav') return 'bg-rose-600/10';
+        if (type === 'border-nav') return 'border border-rose-600/20';
+        if (type === 'text-icon') return 'text-rose-400';
+        if (type === 'bg-dot') return 'bg-rose-500';
+        if (type === 'bg-button') return 'bg-rose-600';
+        if (type === 'bg-button-hover') return 'hover:bg-rose-700';
+        if (type === 'bg-badge') return 'bg-rose-50/10';
+        if (type === 'text-badge') return 'text-rose-400';
+        if (type === 'border-badge') return 'border-rose-500/20';
+        return '';
+      default: // blue
+        if (type === 'text-nav') return 'text-blue-400';
+        if (type === 'bg-nav') return 'bg-blue-600/10';
+        if (type === 'border-nav') return 'border border-blue-600/20';
+        if (type === 'text-icon') return 'text-blue-400';
+        if (type === 'bg-dot') return 'bg-blue-500';
+        if (type === 'bg-button') return 'bg-blue-600';
+        if (type === 'bg-button-hover') return 'hover:bg-blue-700';
+        if (type === 'bg-badge') return 'bg-blue-50/10';
+        if (type === 'text-badge') return 'text-blue-400';
+        if (type === 'border-badge') return 'border-blue-500/20';
+        return '';
+    }
+  };
+
   useEffect(() => {
     if (theme === 'dark') {
       document.documentElement.classList.add('dark');
@@ -59,6 +156,30 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('hris_display_density', displayDensity);
   }, [displayDensity]);
+
+  // Listen to custom system configurations changes
+  useEffect(() => {
+    const handleConfigUpdate = (e: any) => {
+      if (e.detail) {
+        if (e.detail.accentTheme) setAccentTheme(e.detail.accentTheme);
+        if (e.detail.sidebarBrand) setSidebarBrand(e.detail.sidebarBrand);
+        if (e.detail.systemLang) setSystemLang(e.detail.systemLang);
+        if (e.detail.showDbSidebar) setShowDbSidebar(e.detail.showDbSidebar);
+        if (e.detail.autoRejectLeave) setAutoRejectLeave(e.detail.autoRejectLeave);
+      } else {
+        setAccentTheme(localStorage.getItem('hris_accent_theme') || 'blue');
+        setSidebarBrand(localStorage.getItem('hris_sidebar_brand') || 'HRIS Enterprise');
+        setSystemLang(localStorage.getItem('hris_system_lang') || 'id');
+        setShowDbSidebar(localStorage.getItem('hris_show_db_sidebar') || 'on');
+        setAutoRejectLeave(localStorage.getItem('hris_auto_reject_leave') || 'on');
+      }
+    };
+
+    window.addEventListener('hris_system_config_updated', handleConfigUpdate);
+    return () => {
+      window.removeEventListener('hris_system_config_updated', handleConfigUpdate);
+    };
+  }, []);
 
   // Core Persistent States with LocalStorage fallback
   const [employees, setEmployees] = useState<Employee[]>(() => {
@@ -201,6 +322,36 @@ export default function App() {
           if (dbData.deviceConfig) {
             setDeviceConfig(dbData.deviceConfig);
             lastSavedData.current.deviceConfig = JSON.stringify(dbData.deviceConfig);
+            
+            // Populate and synchronize systemConfig configurations
+            if (dbData.deviceConfig.systemConfig) {
+              const sys = dbData.deviceConfig.systemConfig;
+              if (sys.serverTimeout) localStorage.setItem('hris_server_timeout', String(sys.serverTimeout));
+              if (sys.dbPoolLimit) localStorage.setItem('hris_db_pool_limit', String(sys.dbPoolLimit));
+              if (sys.autosaveFreq) localStorage.setItem('hris_autosave_freq', String(sys.autosaveFreq));
+              if (sys.logRetention) localStorage.setItem('hris_log_retention', String(sys.logRetention));
+              if (sys.accentTheme) {
+                localStorage.setItem('hris_accent_theme', String(sys.accentTheme));
+                setAccentTheme(sys.accentTheme);
+              }
+              if (sys.sidebarBrand) {
+                localStorage.setItem('hris_sidebar_brand', String(sys.sidebarBrand));
+                setSidebarBrand(sys.sidebarBrand);
+              }
+              if (sys.systemLang) {
+                localStorage.setItem('hris_system_lang', String(sys.systemLang));
+                setSystemLang(sys.systemLang);
+              }
+              if (sys.audioAlerts) localStorage.setItem('hris_audio_alerts', String(sys.audioAlerts));
+              if (sys.showDbSidebar) {
+                localStorage.setItem('hris_show_db_sidebar', String(sys.showDbSidebar));
+                setShowDbSidebar(sys.showDbSidebar);
+              }
+              if (sys.autoRejectLeave) {
+                localStorage.setItem('hris_auto_reject_leave', String(sys.autoRejectLeave));
+                setAutoRejectLeave(sys.autoRejectLeave);
+              }
+            }
           }
           if (dbData.periods) {
             setPeriods(dbData.periods);
@@ -712,14 +863,45 @@ export default function App() {
   };
 
   // 3. Leave approvals & reactive state mutations
-  const handleAddLeaveRequest = (newReq: LeaveRequest) => {
-    const leaveWithApproval: LeaveRequest = {
+  const processNewLeaveRequest = (newReq: LeaveRequest): LeaveRequest => {
+    let finalLeave: LeaveRequest = {
       ...newReq,
       managerApproval: 'Pending',
       hrApproval: 'Pending'
     };
-    setLeaves(prev => [leaveWithApproval, ...prev]);
-    addAuditLog('Cuti/Izin', 'Pengajuan Cuti/Permisi', `Menambahkan pengajuan ${newReq.type} untuk ${newReq.employeeName} (${newReq.duration} hari kerja).`);
+
+    const isAutoRejectActive = localStorage.getItem('hris_auto_reject_leave') !== 'off';
+    if (isAutoRejectActive && newReq.type === 'Cuti Tahunan') {
+      const empSelectedLeaves = leaves.filter(l => l.employeeId === newReq.employeeId);
+      const approvedAnnualLeavesCount = empSelectedLeaves
+        .filter(l => l.type === 'Cuti Tahunan' && l.status === 'Disetujui')
+        .reduce((sum, l) => sum + l.duration, 0);
+      const remainingQuota = Math.max(0, 12 - approvedAnnualLeavesCount);
+
+      if (newReq.duration > remainingQuota) {
+        // Exceeds quota! Auto-reject.
+        finalLeave = {
+          ...finalLeave,
+          status: 'Ditolak',
+          managerApproval: 'Ditolak',
+          hrApproval: 'Ditolak',
+          approvedByManager: 'Sistem Auto-Reject',
+          approvedByHR: 'Sistem Auto-Reject',
+          reason: `${newReq.reason} (Sistem Auto-Reject: Melebihi kuota cuti tahunan berjalan. Sisa jatah: ${remainingQuota} hari, Diajukan: ${newReq.duration} hari)`
+        };
+      }
+    }
+    return finalLeave;
+  };
+
+  const handleAddLeaveRequest = (newReq: LeaveRequest) => {
+    const finalLeave = processNewLeaveRequest(newReq);
+    setLeaves(prev => [finalLeave, ...prev]);
+    if (finalLeave.status === 'Ditolak') {
+      addAuditLog('Cuti/Izin', 'Auto-Reject Cuti', `Pengajuan Cuti Tahunan ${newReq.employeeName} ditolak otomatis oleh sistem karena melebihi kuota (Diajukan: ${newReq.duration} hari).`, 'Peringatan');
+    } else {
+      addAuditLog('Cuti/Izin', 'Pengajuan Cuti/Permisi', `Menambahkan pengajuan ${newReq.type} untuk ${newReq.employeeName} (${newReq.duration} hari kerja).`);
+    }
   };
 
   const handleUpdateLeaveStatus = (
@@ -993,6 +1175,25 @@ export default function App() {
   const handleMenuClick = (id: string) => {
     setActiveTab(id);
     setMobileMenuOpen(false);
+    
+    // Play a soft, non-intrusive high-quality synthetic click beep
+    if (localStorage.getItem('hris_audio_alerts') !== 'off') {
+      try {
+        const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(700, audioCtx.currentTime); // Crisp click tone
+        gain.gain.setValueAtTime(0.06, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.08);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.08);
+      } catch (e) {
+        // Safe catch for user interaction policy or unsupported environments
+      }
+    }
   };
 
   // Segmented access-level lists filtering
@@ -1062,8 +1263,13 @@ export default function App() {
             deviceConfig={deviceConfig}
             onMarkAnnouncementAsRead={handleMarkAnnouncementAsRead}
             onAddLeaveRequest={(newLeave) => {
-              setLeaves(prev => [newLeave, ...prev]);
-              addAuditLog('Cuti/Izin', 'Pengajuan Cuti Karyawan', `Pengajuan cuti ${newLeave.employeeName} (${newLeave.employeeId}) berhasil disinkronkan dari Portal Mandiri.`);
+              const finalLeave = processNewLeaveRequest(newLeave);
+              setLeaves(prev => [finalLeave, ...prev]);
+              if (finalLeave.status === 'Ditolak') {
+                addAuditLog('Cuti/Izin', 'Auto-Reject Cuti', `Pengajuan Cuti Tahunan ${newLeave.employeeName} ditolak otomatis oleh sistem karena melebihi kuota dari Portal Mandiri.`, 'Peringatan');
+              } else {
+                addAuditLog('Cuti/Izin', 'Pengajuan Cuti Karyawan', `Pengajuan cuti ${newLeave.employeeName} (${newLeave.employeeId}) berhasil disinkronkan dari Portal Mandiri.`);
+              }
             }}
             onBackToAdmin={() => {
               setUserRole('admin');
@@ -1077,11 +1283,11 @@ export default function App() {
       {/* Desktop Sidebar Navigation */}
       <aside className="hidden md:flex flex-col w-64 bg-[#0F172A] flex-shrink-0 h-screen text-slate-400" id="hris-sidebar-desktop">
         <div className="p-6 flex items-center gap-3 border-b border-slate-800/50" id="sidebar-logo-area">
-          <div className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center text-white font-bold text-xl italic shadow-md">
-            H
+          <div className={`w-8 h-8 ${getAccentColor('bg-button')} rounded flex items-center justify-center text-white font-bold text-xl italic shadow-md`}>
+            {sidebarBrand.charAt(0).toUpperCase()}
           </div>
           <div>
-            <span className="text-white font-bold tracking-tight text-base block leading-tight">HRIS Enterprise</span>
+            <span className="text-white font-bold tracking-tight text-base block leading-tight">{sidebarBrand}</span>
             <span className="text-[10px] text-slate-500 font-medium uppercase tracking-wider block mt-0.5">BIOMETRIC SYNC</span>
           </div>
         </div>
@@ -1093,20 +1299,20 @@ export default function App() {
             const isActive = activeTab === item.id;
             
             return (
-              <button
-                key={item.id}
-                onClick={() => handleMenuClick(item.id)}
-                className={`w-full text-left inline-flex items-center gap-3 px-4 py-3 rounded-lg font-bold text-xs transition-all cursor-pointer ${
-                  isActive 
-                    ? 'bg-blue-600/10 text-blue-400 border border-blue-600/20' 
-                    : 'text-slate-400 hover:text-white hover:bg-slate-850'
-                }`}
-                id={`nav-link-desktop-${item.id}`}
-              >
-                <Icon className={`w-4.5 h-4.5 shrink-0 ${isActive ? 'text-blue-450' : 'text-slate-400'}`} />
-                <span className="truncate">{item.label}</span>
-                {isActive && <div className="w-1.5 h-1.5 rounded-full bg-blue-500 ml-auto" />}
-              </button>
+               <button
+                 key={item.id}
+                 onClick={() => handleMenuClick(item.id)}
+                 className={`w-full text-left inline-flex items-center gap-3 px-4 py-3 rounded-lg font-bold text-xs transition-all cursor-pointer ${
+                   isActive 
+                     ? `${getAccentColor('bg-nav')} ${getAccentColor('text-nav')} border ${getAccentColor('border-nav')}` 
+                     : 'text-slate-400 hover:text-white hover:bg-slate-850'
+                 }`}
+                 id={`nav-link-desktop-${item.id}`}
+               >
+                 <Icon className={`w-4.5 h-4.5 shrink-0 ${isActive ? getAccentColor('text-icon') : 'text-slate-400'}`} />
+                 <span className="truncate">{item.label}</span>
+                 {isActive && <div className={`w-1.5 h-1.5 rounded-full ${getAccentColor('bg-dot')} ml-auto`} />}
+               </button>
             );
           })}
         </nav>
@@ -1124,52 +1330,54 @@ export default function App() {
           </button>
         </div>
 
-        <div className="p-4 border-t border-slate-800/80 bg-slate-950/40 text-[10.5px] leading-4 space-y-2">
-          <div>
-            <p className="font-extrabold text-white flex items-center gap-1.5">
-              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" /> Solution SDK: Live
-            </p>
-            <p className="text-[9px] text-slate-500">Device ID: <span className="font-mono text-slate-400">X-100C-01</span></p>
-          </div>
-          
-          <div className="border-t border-slate-800/40 pt-2 space-y-1.5 text-slate-400">
-            <p className="font-bold text-[9px] text-slate-400 uppercase tracking-wider">KONDISI DATABASE UTAMA</p>
-            <p className="flex items-center gap-1.5">
-              <span className={`w-1.5 h-1.5 rounded-full ${dbStatus.connected ? 'bg-green-500' : 'bg-amber-500'}`} />
-              <span>Koneksi: </span>
-              <span className="text-slate-200 font-mono text-[10.5px] font-semibold">
-                {dbStatus.connected ? 'MySQL Live' : 'Penyimpanan Lokal'}
-              </span>
-            </p>
-            {dbStatus.connected ? (
-              <>
-                <div className="flex items-center justify-between text-[10px] text-slate-400">
-                  <span>Ping Latency:</span>
-                  <span className={`font-mono font-bold ${dbStatus.latencyMs !== undefined && dbStatus.latencyMs < 50 ? 'text-green-400' : 'text-amber-400'}`}>
-                    {dbStatus.latencyMs !== undefined && dbStatus.latencyMs >= 0 ? `${dbStatus.latencyMs} ms` : '12 ms'}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-[10px] text-slate-400">
-                  <span>Database:</span>
-                  <span className="font-mono text-blue-400 font-semibold">{dbStatus.databaseName || 'hpstate'}</span>
-                </div>
-                <div className="flex items-center justify-between text-[10px] text-slate-400">
-                  <span>Sinkronisasi tabel:</span>
-                  <span className="text-green-450 font-semibold font-mono">Sukses</span>
-                </div>
-                {dbStatus.lastSync && (
-                  <div className="text-[9px] text-slate-500 italic mt-0.5 leading-tight">
-                    Terakhir Sinkron: {new Date(dbStatus.lastSync).toLocaleTimeString('id-ID')}
+        {showDbSidebar === 'on' && (
+          <div className="p-4 border-t border-slate-800/80 bg-slate-950/40 text-[10.5px] leading-4 space-y-2">
+            <div>
+              <p className="font-extrabold text-white flex items-center gap-1.5">
+                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" /> Solution SDK: Live
+              </p>
+              <p className="text-[9px] text-slate-500">Device ID: <span className="font-mono text-slate-400">X-100C-01</span></p>
+            </div>
+            
+            <div className="border-t border-slate-800/40 pt-2 space-y-1.5 text-slate-400">
+              <p className="font-bold text-[9px] text-slate-400 uppercase tracking-wider">KONDISI DATABASE UTAMA</p>
+              <p className="flex items-center gap-1.5">
+                <span className={`w-1.5 h-1.5 rounded-full ${dbStatus.connected ? 'bg-green-500' : 'bg-amber-500'}`} />
+                <span>Koneksi: </span>
+                <span className="text-slate-200 font-mono text-[10.5px] font-semibold">
+                  {dbStatus.connected ? 'MySQL Live' : 'Penyimpanan Lokal'}
+                </span>
+              </p>
+              {dbStatus.connected ? (
+                <>
+                  <div className="flex items-center justify-between text-[10px] text-slate-400">
+                    <span>Ping Latency:</span>
+                    <span className={`font-mono font-bold ${dbStatus.latencyMs !== undefined && dbStatus.latencyMs < 50 ? 'text-green-400' : 'text-amber-400'}`}>
+                      {dbStatus.latencyMs !== undefined && dbStatus.latencyMs >= 0 ? `${dbStatus.latencyMs} ms` : '12 ms'}
+                    </span>
                   </div>
-                )}
-              </>
-            ) : (
-              <div className="text-[9px] text-amber-500/80 leading-normal bg-amber-500/5 p-1 rounded border border-amber-500/10 mt-1">
-                ⚠️ Menggunakan cadangan lokal JSON. Hubungkan MySQL di Pengaturan untuk mengaktifkan sinkronisasi real-time.
-              </div>
-            )}
+                  <div className="flex items-center justify-between text-[10px] text-slate-400">
+                    <span>Database:</span>
+                    <span className="font-mono text-blue-400 font-semibold">{dbStatus.databaseName || 'hpstate'}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-[10px] text-slate-400">
+                    <span>Sinkronisasi tabel:</span>
+                    <span className="text-green-450 font-semibold font-mono">Sukses</span>
+                  </div>
+                  {dbStatus.lastSync && (
+                    <div className="text-[9px] text-slate-500 italic mt-0.5 leading-tight">
+                      Terakhir Sinkron: {new Date(dbStatus.lastSync).toLocaleTimeString('id-ID')}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="text-[9px] text-amber-500/80 leading-normal bg-amber-500/5 p-1 rounded border border-amber-500/10 mt-1">
+                  ⚠️ Menggunakan cadangan lokal JSON. Hubungkan MySQL di Pengaturan untuk mengaktifkan sinkronisasi real-time.
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </aside>
 
       {/* Main Content Area */}

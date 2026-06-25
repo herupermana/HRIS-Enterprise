@@ -214,6 +214,42 @@ export default function Pengaturan({
     };
   });
 
+  // System Configurations (Server & UI)
+  const [serverTimeout, setServerTimeout] = useState<number>(() => {
+    const saved = localStorage.getItem('hris_server_timeout');
+    return saved ? parseInt(saved, 10) : deviceConfig?.systemConfig?.serverTimeout || 10000;
+  });
+  const [dbPoolLimit, setDbPoolLimit] = useState<number>(() => {
+    const saved = localStorage.getItem('hris_db_pool_limit');
+    return saved ? parseInt(saved, 10) : deviceConfig?.systemConfig?.dbPoolLimit || 15;
+  });
+  const [autosaveFreq, setAutosaveFreq] = useState<string>(() => {
+    return localStorage.getItem('hris_autosave_freq') || deviceConfig?.systemConfig?.autosaveFreq || 'instant';
+  });
+  const [logRetention, setLogRetention] = useState<number>(() => {
+    const saved = localStorage.getItem('hris_log_retention');
+    return saved ? parseInt(saved, 10) : deviceConfig?.systemConfig?.logRetention || 30;
+  });
+
+  const [accentTheme, setAccentTheme] = useState<string>(() => {
+    return localStorage.getItem('hris_accent_theme') || deviceConfig?.systemConfig?.accentTheme || 'blue';
+  });
+  const [sidebarBrand, setSidebarBrand] = useState<string>(() => {
+    return localStorage.getItem('hris_sidebar_brand') || deviceConfig?.systemConfig?.sidebarBrand || 'HRIS Enterprise';
+  });
+  const [systemLang, setSystemLang] = useState<string>(() => {
+    return localStorage.getItem('hris_system_lang') || deviceConfig?.systemConfig?.systemLang || 'id';
+  });
+  const [audioAlerts, setAudioAlerts] = useState<string>(() => {
+    return localStorage.getItem('hris_audio_alerts') || deviceConfig?.systemConfig?.audioAlerts || 'on';
+  });
+  const [showDbSidebar, setShowDbSidebar] = useState<string>(() => {
+    return localStorage.getItem('hris_show_db_sidebar') || deviceConfig?.systemConfig?.showDbSidebar || 'on';
+  });
+  const [autoRejectLeave, setAutoRejectLeave] = useState<string>(() => {
+    return localStorage.getItem('hris_auto_reject_leave') || deviceConfig?.systemConfig?.autoRejectLeave || 'on';
+  });
+
   // Synchronize when remote config loads
   React.useEffect(() => {
     if (deviceConfig?.companyProfile) {
@@ -221,9 +257,61 @@ export default function Pengaturan({
     }
   }, [deviceConfig?.companyProfile]);
 
+  // Synchronize system config when loaded from server
+  React.useEffect(() => {
+    if (deviceConfig?.systemConfig) {
+      const sys = deviceConfig.systemConfig;
+      if (sys.serverTimeout) setServerTimeout(sys.serverTimeout);
+      if (sys.dbPoolLimit) setDbPoolLimit(sys.dbPoolLimit);
+      if (sys.autosaveFreq) setAutosaveFreq(sys.autosaveFreq);
+      if (sys.logRetention) setLogRetention(sys.logRetention);
+      if (sys.accentTheme) setAccentTheme(sys.accentTheme);
+      if (sys.sidebarBrand) setSidebarBrand(sys.sidebarBrand);
+      if (sys.systemLang) setSystemLang(sys.systemLang);
+      if (sys.audioAlerts) setAudioAlerts(sys.audioAlerts);
+      if (sys.showDbSidebar) setShowDbSidebar(sys.showDbSidebar);
+      if (sys.autoRejectLeave) setAutoRejectLeave(sys.autoRejectLeave);
+    }
+  }, [deviceConfig?.systemConfig]);
+
   const handleSaveSettings = (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaved(true);
+    
+    // Play a delightful professional double-beep confirmation chime
+    if (audioAlerts !== 'off') {
+      try {
+        const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        
+        // First beep
+        const osc1 = audioCtx.createOscillator();
+        const gain1 = audioCtx.createGain();
+        osc1.connect(gain1);
+        gain1.connect(audioCtx.destination);
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(800, audioCtx.currentTime);
+        gain1.gain.setValueAtTime(0.08, audioCtx.currentTime);
+        gain1.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.1);
+        osc1.start();
+        osc1.stop(audioCtx.currentTime + 0.1);
+        
+        // Second beep shortly after
+        setTimeout(() => {
+          try {
+            const osc2 = audioCtx.createOscillator();
+            const gain2 = audioCtx.createGain();
+            osc2.connect(gain2);
+            gain2.connect(audioCtx.destination);
+            osc2.type = 'sine';
+            osc2.frequency.setValueAtTime(1000, audioCtx.currentTime);
+            gain2.gain.setValueAtTime(0.08, audioCtx.currentTime);
+            gain2.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.12);
+            osc2.start();
+            osc2.stop(audioCtx.currentTime + 0.12);
+          } catch (e) {}
+        }, 80);
+      } catch (e) {}
+    }
     
     // Save to local storage for backward compatibility with components directly reading it
     localStorage.setItem('hris_working_hour_start', shiftState.workingHourStart);
@@ -239,11 +327,33 @@ export default function Pengaturan({
     localStorage.setItem('hris_meal_transport_allowance', String(mealAllowance));
     localStorage.setItem('hris_overtime_rate', String(overtimeRate));
 
-    // Dispatch event to notify Penggajian component
+    // Persist system configurations
+    localStorage.setItem('hris_server_timeout', String(serverTimeout));
+    localStorage.setItem('hris_db_pool_limit', String(dbPoolLimit));
+    localStorage.setItem('hris_autosave_freq', String(autosaveFreq));
+    localStorage.setItem('hris_log_retention', String(logRetention));
+    localStorage.setItem('hris_accent_theme', String(accentTheme));
+    localStorage.setItem('hris_sidebar_brand', String(sidebarBrand));
+    localStorage.setItem('hris_system_lang', String(systemLang));
+    localStorage.setItem('hris_audio_alerts', String(audioAlerts));
+    localStorage.setItem('hris_show_db_sidebar', String(showDbSidebar));
+    localStorage.setItem('hris_auto_reject_leave', String(autoRejectLeave));
+
+    // Dispatch event to notify other components (e.g., Penggajian & App sidebar)
     try {
       window.dispatchEvent(new CustomEvent('hris_salary_config_updated'));
+      window.dispatchEvent(new CustomEvent('hris_system_config_updated', {
+        detail: {
+          accentTheme,
+          sidebarBrand,
+          systemLang,
+          audioAlerts,
+          showDbSidebar,
+          autoRejectLeave
+        }
+      }));
     } catch (e) {
-      console.warn('Failed to dispatch salary config event', e);
+      console.warn('Failed to dispatch config events', e);
     }
 
     if (onUpdateShiftConfig) {
@@ -254,14 +364,26 @@ export default function Pengaturan({
         ...deviceConfig,
         enabledModules: localModules,
         companyProfile: companyProfile,
-        shiftConfig: shiftState
+        shiftConfig: shiftState,
+        systemConfig: {
+          serverTimeout,
+          dbPoolLimit,
+          autosaveFreq,
+          logRetention,
+          accentTheme,
+          sidebarBrand,
+          systemLang,
+          audioAlerts,
+          showDbSidebar,
+          autoRejectLeave
+        }
       });
       // Also trigger a custom log for administrative trace
       window.dispatchEvent(new CustomEvent('hris_add_audit_log', {
         detail: {
           module: 'Konfigurasi',
           action: 'Ubah Aturan Kerja & Profil',
-          details: `Melakukan pembaruan profil ${companyProfile.name} beserta parameter jam kerja masuk (${shiftState.workingHourStart}) & toleransi (${shiftState.toleranceMinutes} menit) secara terpadu di server database.`,
+          details: `Melakukan pembaruan profil ${companyProfile.name} beserta parameter jam kerja masuk (${shiftState.workingHourStart}), toleransi (${shiftState.toleranceMinutes} menit), dan konfigurasi sistem (Server & UI) secara terpadu di database.`,
           status: 'Sukses'
         }
       }));
@@ -282,8 +404,8 @@ export default function Pengaturan({
         </div>
         
         {isSaved && (
-          <span className="text-[10px] font-bold text-blue-800 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-xl flex items-center gap-1">
-            <CheckCircle className="w-3.5 h-3.5" /> Konfigurasi Disimpan!
+          <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl flex items-center gap-1.5 animate-pulse">
+            <CheckCircle className="w-3.5 h-3.5 text-emerald-600" /> Konfigurasi Regulasi Tarif Finansial, Perpajakan &amp; BPJS Berhasil Disimpan!
           </span>
         )}
       </div>
@@ -752,6 +874,207 @@ export default function Pengaturan({
                   Monitor Besar
                 </span>
               </button>
+            </div>
+          </div>
+
+          {/* Konfigurasi Server & Keamanan */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4" id="server-config-card">
+            <h4 className="text-sm font-semibold text-slate-850 tracking-tight flex items-center gap-1.5 pb-2 border-b border-slate-100">
+              <Server className="w-4.5 h-4.5 text-blue-600" /> Konfigurasi Server &amp; Database
+            </h4>
+            <p className="text-[10px] text-gray-400 leading-relaxed">
+              Atur parameter kinerja server backend Node.js dan optimasi koneksi pooling database MySQL Anda.
+            </p>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-[10px] text-slate-500 font-medium mb-1">Batas Waktu Permintaan API / Timeout (ms)</label>
+                <select
+                  value={serverTimeout}
+                  onChange={(e) => setServerTimeout(parseInt(e.target.value, 10))}
+                  className="w-full bg-slate-50 border border-slate-200 p-2 rounded-lg text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-500 focus:bg-white"
+                >
+                  <option value={5000}>5,000 ms (Koneksi Cepat)</option>
+                  <option value={10000}>10,000 ms (Standar Cloud Run)</option>
+                  <option value={15000}>15,000 ms (Jaringan Seluler)</option>
+                  <option value={30000}>30,000 ms (Sangat Lambat)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] text-slate-500 font-medium mb-1">MySQL Connection Pool Limit</label>
+                <select
+                  value={dbPoolLimit}
+                  onChange={(e) => setDbPoolLimit(parseInt(e.target.value, 10))}
+                  className="w-full bg-slate-50 border border-slate-200 p-2 rounded-lg text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-500 focus:bg-white"
+                >
+                  <option value={5}>5 Koneksi (VPS Hemat / Shared)</option>
+                  <option value={10}>10 Koneksi (Medium aaPanel)</option>
+                  <option value={15}>15 Koneksi (Standar Cloud SQL)</option>
+                  <option value={20}>20 Koneksi (Tinggi)</option>
+                  <option value={50}>50 Koneksi (Skala Besar)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] text-slate-500 font-medium mb-1">Frekuensi Auto-Sync Luring ke MySQL</label>
+                <select
+                  value={autosaveFreq}
+                  onChange={(e) => setAutosaveFreq(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 p-2 rounded-lg text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-500 focus:bg-white"
+                >
+                  <option value="instant">Seketika / Real-time Sync</option>
+                  <option value="5s">Debounce 5 Detik (Menghemat Bandwidth)</option>
+                  <option value="30s">Debounce 30 Detik</option>
+                  <option value="manual">Manual Saja (Hemat CPU)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] text-slate-500 font-medium mb-1">Retensi Riwayat Audit Log Keamanan</label>
+                <select
+                  value={logRetention}
+                  onChange={(e) => setLogRetention(parseInt(e.target.value, 10))}
+                  className="w-full bg-slate-50 border border-slate-200 p-2 rounded-lg text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-500 focus:bg-white"
+                >
+                  <option value={30}>30 Hari (Standar GDPR)</option>
+                  <option value={90}>90 Hari (Rekomendasi Korporasi)</option>
+                  <option value={365}>365 Hari / 1 Tahun (Kepatuhan Pajak)</option>
+                  <option value={9999}>Selamanya / Tanpa Batas</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Konfigurasi Aturan Cuti & Izin */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4" id="leave-rules-config-card">
+            <h4 className="text-sm font-semibold text-slate-850 tracking-tight flex items-center gap-1.5 pb-2 border-b border-slate-100">
+              <Calendar className="w-4.5 h-4.5 text-blue-600" /> Konfigurasi Aturan Cuti &amp; Izin
+            </h4>
+            <p className="text-[10px] text-gray-400 leading-relaxed">
+              Atur parameter validasi pengajuan cuti tahunan dan penanganan otomatis terhadap kuota tahunan karyawan.
+            </p>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-[10px] text-slate-500 font-medium mb-1">Fitur 'Auto-Reject' Cuti Melebihi Kuota</label>
+                <select
+                  value={autoRejectLeave}
+                  onChange={(e) => setAutoRejectLeave(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 p-2 rounded-lg text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-500 focus:bg-white"
+                >
+                  <option value="on">Aktif (Tolak Otomatis jika Melebihi 12 Hari/Tahun)</option>
+                  <option value="off">Nonaktif (Biarkan Tetap Masuk Sebagai Pending)</option>
+                </select>
+                <p className="text-[9px] text-slate-400 mt-1 font-medium leading-relaxed">
+                  Apabila diaktifkan, setiap pengajuan dengan jenis "Cuti Tahunan" yang durasi kerjanya melebihi sisa jatah tahunan (maksimal 12 hari per tahun berjalan) akan langsung ditolak otomatis oleh sistem saat pertama kali diajukan.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Konfigurasi UI & Antarmuka */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4" id="ui-config-card">
+            <h4 className="text-sm font-semibold text-slate-850 tracking-tight flex items-center gap-1.5 pb-2 border-b border-slate-100">
+              <Sliders className="w-4.5 h-4.5 text-blue-600" /> Konfigurasi Tampilan &amp; UI Sistem
+            </h4>
+            <p className="text-[10px] text-gray-400 leading-relaxed">
+              Atur personalisasi warna aksen visual, penamaan nama sistem di sidebar, serta bahasa operasional workspace.
+            </p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-[10px] text-slate-500 font-medium mb-1">Nama Brand Sistem Sidebar</label>
+                <input
+                  type="text"
+                  value={sidebarBrand}
+                  onChange={(e) => setSidebarBrand(e.target.value)}
+                  placeholder="e.g. HRIS Enterprise"
+                  className="w-full bg-slate-50 border border-slate-200 p-2 rounded-lg text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-500 focus:bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] text-slate-500 font-medium mb-1">Tema Warna Aksen Aplikasi</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { id: 'blue', label: 'Biru Klasik', class: 'bg-blue-600' },
+                    { id: 'emerald', label: 'Professional Green', class: 'bg-emerald-600' },
+                    { id: 'indigo', label: 'Indigo Corporate', class: 'bg-indigo-600' },
+                    { id: 'violet', label: 'Royal Violet', class: 'bg-violet-600' },
+                    { id: 'amber', label: 'Warm Amber', class: 'bg-amber-500' },
+                    { id: 'rose', label: 'Rosewood Red', class: 'bg-rose-600' }
+                  ].map((themeOpt) => (
+                    <button
+                      key={themeOpt.id}
+                      type="button"
+                      onClick={() => setAccentTheme(themeOpt.id)}
+                      className={`p-1.5 rounded-lg border text-[10px] font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                        accentTheme === themeOpt.id
+                          ? 'border-slate-800 bg-slate-50 shadow-sm'
+                          : 'border-slate-200 bg-white hover:bg-slate-50'
+                      }`}
+                    >
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${themeOpt.class}`} />
+                      <span className="truncate">{themeOpt.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] text-slate-500 font-medium mb-1">Bahasa Sistem</label>
+                  <select
+                    value={systemLang}
+                    onChange={(e) => setSystemLang(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 p-2 rounded-lg text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-500 focus:bg-white"
+                  >
+                    <option value="id">Bahasa Indonesia</option>
+                    <option value="en">English (US)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] text-slate-500 font-medium mb-1">Feedback Suara</label>
+                  <select
+                    value={audioAlerts}
+                    onChange={(e) => setAudioAlerts(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 p-2 rounded-lg text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-500 focus:bg-white"
+                  >
+                    <option value="on">Aktif (Suara Beep)</option>
+                    <option value="off">Mute / Sunyi</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] text-slate-500 font-medium mb-1">Status Widget DB di Sidebar</label>
+                <div className="flex gap-4 mt-1">
+                  <label className="inline-flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="showDbSidebar"
+                      value="on"
+                      checked={showDbSidebar === 'on'}
+                      onChange={() => setShowDbSidebar('on')}
+                      className="text-blue-600 focus:ring-blue-500"
+                    />
+                    Tampilkan
+                  </label>
+                  <label className="inline-flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="showDbSidebar"
+                      value="off"
+                      checked={showDbSidebar === 'off'}
+                      onChange={() => setShowDbSidebar('off')}
+                      className="text-blue-600 focus:ring-blue-500"
+                    />
+                    Sembunyikan
+                  </label>
+                </div>
+              </div>
             </div>
           </div>
 
